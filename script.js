@@ -1,12 +1,12 @@
 // Конфигурация Firebase (из консоли Firebase)
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyDHliWG6J_6iTarmqIMnrBjAjNSG0MPihk",
+  authDomain: "huxtextigm.firebaseapp.com",
+  projectId: "huxtextigm",
+  storageBucket: "huxtextigm.firebasestorage.app",
+  messagingSenderId: "496908406007",
+  appId: "1:496908406007:web:dbbfb8d24b1a286daf57f2",
+  measurementId: "G-SG23YZ7P3L"
 };
 
 // Инициализация Firebase
