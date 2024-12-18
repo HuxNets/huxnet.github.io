@@ -1,5 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js';
 import { getDatabase, ref, set, push, onValue, remove } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js';
+
 // Конфигурация Firebase (из консоли Firebase)
 const firebaseConfig = {
   apiKey: "AIzaSyDHliWG6J_6iTarmqIMnrBjAjNSG0MPihk",
@@ -12,8 +13,8 @@ const firebaseConfig = {
 };
 
 // Инициализация Firebase
-firebase.initializeApp(firebaseConfig);
-const database = firebase.database();
+const app = initializeApp(firebaseConfig);
+const database = getDatabase(app);
 
 document.addEventListener('DOMContentLoaded', () => {
     // Получение всех элементов
@@ -57,13 +58,13 @@ document.addEventListener('DOMContentLoaded', () => {
     class UploadManager {
         // Сохранение глобальных настроек
         static saveGlobalSettings(settings) {
-            return database.ref('globalSettings').set(settings);
+            return set(ref(database, 'globalSettings'), settings);
         }
 
         // Получение глобальных настроек
         static initGlobalSettingsListener(callback) {
-            const settingsRef = database.ref('globalSettings');
-            settingsRef.on('value', (snapshot) => {
+            const settingsRef = ref(database, 'globalSettings');
+            onValue(settingsRef, (snapshot) => {
                 const settings = snapshot.val() || globalSettings;
                 callback(settings);
             });
@@ -71,7 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Сохранение загрузки
         static saveUpload(upload) {
-            const uploadsRef = database.ref('uploads');
+            const uploadsRef = ref(database, 'uploads');
             
             // Проверка глобальных ограничений
             if (globalSettings.imageUploadDisabled && upload.type === 'image') {
@@ -96,13 +97,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 return false;
             }
 
-            return uploadsRef.push(upload);
+            return push(uploadsRef, upload);
         }
 
         // Получение всех загрузок
         static initUploadsListener(callback) {
-            const uploadsRef = database.ref('uploads');
-            uploadsRef.on('value', (snapshot) => {
+            const uploadsRef = ref(database, 'uploads');
+            onValue(uploadsRef, (snapshot) => {
                 const uploadsData = snapshot.val();
                 const uploadsList = uploadsData ? Object.values(uploadsData) : [];
                 callback(uploadsList);
@@ -111,7 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Сброс всех загрузок
         static resetUploads() {
-            return database.ref('uploads').remove();
+            return remove(ref(database, 'uploads'));
         }
     }
 
@@ -187,9 +188,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Загрузка фото
+                          // Загрузка фото
     uploadPhotoBtn.addEventListener('click', () => {
-        if (disableImageUploadCheckbox.checked) {
+        if (globalSettings.imageUploadDisabled) {
             alert('Загрузка изображений отключена администратором');
             return;
         }
@@ -214,7 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Добавление текста
     addTextBtn.addEventListener('click', () => {
-        if (disableTextUploadCheckbox.checked) {
+        if (globalSettings.textUploadDisabled) {
             alert('Отправка текста отключена администратором');
             return;
         }
@@ -259,7 +260,7 @@ document.addEventListener('DOMContentLoaded', () => {
             a.href = URL.createObjectURL(content);
             a.download = 'images.zip';
             a.click();
-          });
+        });
     });
 
     // Скачивание текстов
@@ -279,18 +280,9 @@ document.addEventListener('DOMContentLoaded', () => {
         a.download = 'texts.txt';
         a.click();
     });
-});
 
-// Функция для проверки лимитов загрузок (необязательно)
-function checkUploadLimits(uploads, user, type, limit) {
-    const userUploads = uploads.filter(upload => 
-        upload.user === user && upload.type === type
-    );
-
-    return userUploads.length < limit;
-}
-
- applyLimitsBtn.addEventListener('click', () => {
+    // Применение ограничений
+    applyLimitsBtn.addEventListener('click', () => {
         const newSettings = {
             photoLimit: parseInt(photoLimitInput.value),
             textLimit: parseInt(textLimitInput.value),
@@ -301,3 +293,13 @@ function checkUploadLimits(uploads, user, type, limit) {
         UploadManager.saveGlobalSettings(newSettings);
         alert('Настройки обновлены');
     });
+});
+
+// Функция для проверки лимитов загрузок (необязательно)
+function checkUploadLimits(uploads, user, type, limit) {
+    const userUploads = uploads.filter(upload => 
+        upload.user === user && upload.type === type
+    );
+
+    return userUploads.length < limit;
+}
