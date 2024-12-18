@@ -15,13 +15,11 @@
     </div>
 
     <div class="container hidden">
-        <!-- Левая часть: Загрузки пользователей -->
         <div class="user-content">
             <h1>Загрузки пользователей</h1>
             <div id="uploads-list"></div>
         </div>
 
-        <!-- Правая часть: Панель пользователя -->
         <div class="user-panel">
             <h1>Панель пользователя</h1>
             <div id="user-options">
@@ -31,14 +29,12 @@
                 <button id="add-text-btn">Добавить текст</button>
             </div>
             
-            <!-- Админ панель (будет скрыта для обычных пользователей) -->
             <div id="admin-section" class="hidden">
                 <h1>Админ Панель</h1>
                 <div id="admin-options">
                     <button id="download-images-btn">Скачать все изображения</button>
                     <button id="download-text-btn">Скачать все тексты</button>
                     <button id="reset-uploads-btn">Сбросить все загрузки</button>
-                    <button id="reset-user-limits-btn">Сбросить лимиты пользователей</button>
 
                     <div>
                         <label>
@@ -65,8 +61,6 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js"></script>
-    <script src="script.js"></script>
+    <script type="module" src="script.js"></script>
 </body>
 </html>
