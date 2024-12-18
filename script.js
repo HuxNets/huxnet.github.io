@@ -68,22 +68,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Сохранение загрузки
-        static saveUpload(upload, settings) {
-            // Проверка лимитов
+        static saveUpload(upload) {
             const uploadsRef = database.ref('uploads');
             
             // Проверка глобальных ограничений
-            if (settings.imageUploadDisabled && upload.type === 'image') {
+            if (globalSettings.imageUploadDisabled && upload.type === 'image') {
                 alert('Загрузка изображений запрещена');
                 return false;
             }
 
-            if (settings.textUploadDisabled && upload.type === 'text') {
+            if (globalSettings.textUploadDisabled && upload.type === 'text') {
                 alert('Загрузка текста запрещена');
                 return false;
             }
 
             // Проверка лимитов для пользователя
+            const userUploads = uploads.filter(u => 
+                u.user === upload.user && u.type === upload.type
+            );
+
+            const limit = upload.type === 'image' ? globalSettings.photoLimit : globalSettings.textLimit;
+
+            if (userUploads.length >= limit) {
+                alert(`Достигнут лимит ${limit} ${upload.type === 'image' ? 'фото' : 'текстов'}`);
+                return false;
+            }
+
             return uploadsRef.push(upload);
         }
 
@@ -113,11 +123,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Рендер загрузок
-    function renderUploads(uploadsList) {
-        uploads = uploadsList;
-        uploadsList.innerHTML = '';
+    function renderUploads(uploadList) {
+        uploads = uploadList;
+        uploadsList.innerHTML = ''; // Очищаем список загрузок
 
-        uploadsList.forEach(upload => {
+        uploadList.forEach(upload => {
             const uploadItem = document.createElement('div');
             uploadItem.classList.add('upload-item');
 
@@ -269,7 +279,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-   applyLimitsBtn.addEventListener('click', () => {
+// Функция для проверки лимитов загрузок (необязательно)
+function checkUploadLimits(uploads, user, type, limit) {
+    const userUploads = uploads.filter(upload => 
+        upload.user === user && upload.type === type
+    );
+
+    return userUploads.length < limit;
+}
+
+ applyLimitsBtn.addEventListener('click', () => {
         const newSettings = {
             photoLimit: parseInt(photoLimitInput.value),
             textLimit: parseInt(textLimitInput.value),
@@ -280,14 +299,3 @@ document.addEventListener('DOMContentLoaded', () => {
         UploadManager.saveGlobalSettings(newSettings);
         alert('Настройки обновлены');
     });
-
-// Функция для проверки лимитов загрузок (необязательно)
-function checkUploadLimits(uploads, user, type, limit) {
-    const userUploads = uploads.filter(upload => 
-        upload.user === user && upload.type === type
-    );
-
-    return userUploads.length < limit;
-}
-
-
