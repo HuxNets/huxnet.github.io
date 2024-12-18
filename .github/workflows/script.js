@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Функция для загрузки данных с GitHub
     async function loadUploadsFromGitHub() {
-        const apiUrl = `https://api.github.com/repos/${GITHUB_REPO}/contents/${FILE_PATH}`;
+        const apiUrl = `https://api.github.com/repos/HuxNets/user-uploads/contents/uploads.json`;
 
         try {
             const response = await fetch(apiUrl, {
@@ -69,7 +69,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Функция для обновления файла на GitHub
     async function updateGitHubFile(content) {
-        const apiUrl = `https://api.github.com/repos/${GITHUB_REPO}/contents/${FILE_PATH}`;
+        const apiUrl = `https://api.github.com/repos/HuxNets/user-uploads/contents/uploads.json`;
 
         try {
             const getFileResponse = await fetch(apiUrl, {
