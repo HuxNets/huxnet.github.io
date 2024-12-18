@@ -14,7 +14,7 @@ firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Получение элементов
+    // Получение всех элементов
     const loginBtn = document.getElementById('login-btn');
     const usernameInput = document.getElementById('username');
     const passwordInput = document.getElementById('password');
@@ -27,8 +27,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const addTextBtn = document.getElementById('add-text-btn');
     const adminSection = document.getElementById('admin-section');
     const resetUploadsBtn = document.getElementById('reset-uploads-btn');
+    const resetUserLimitsBtn = document.getElementById('reset-user-limits-btn');
     const disableImageUploadCheckbox = document.getElementById('disable-image-upload');
     const disableTextUploadCheckbox = document.getElementById('disable-text-upload');
+    const photoLimitInput = document.getElementById('photo-limit-input');
+    const textLimitInput = document.getElementById('text-limit-input');
+    const applyLimitsBtn = document.getElementById('apply-limits-btn');
     const downloadImagesBtn = document.getElementById('download-images-btn');
     const downloadTextBtn = document.getElementById('download-text-btn');
 
@@ -40,12 +44,46 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let currentUser = null;
     let uploads = [];
+    let globalSettings = {
+        photoLimit: 3,
+        textLimit: 3,
+        imageUploadDisabled: false,
+        textUploadDisabled: false
+    };
 
-    // Класс для управления загрузками
+    // Класс управления загрузками
     class UploadManager {
+        // Сохранение глобальных настроек
+        static saveGlobalSettings(settings) {
+            return database.ref('globalSettings').set(settings);
+        }
+
+        // Получение глобальных настроек
+        static initGlobalSettingsListener(callback) {
+            const settingsRef = database.ref('globalSettings');
+            settingsRef.on('value', (snapshot) => {
+                const settings = snapshot.val() || globalSettings;
+                callback(settings);
+            });
+        }
+
         // Сохранение загрузки
-        static saveUpload(upload) {
+        static saveUpload(upload, settings) {
+            // Проверка лимитов
             const uploadsRef = database.ref('uploads');
+            
+            // Проверка глобальных ограничений
+            if (settings.imageUploadDisabled && upload.type === 'image') {
+                alert('Загрузка изображений запрещена');
+                return false;
+            }
+
+            if (settings.textUploadDisabled && upload.type === 'text') {
+                alert('Загрузка текста запрещена');
+                return false;
+            }
+
+            // Проверка лимитов для пользователя
             return uploadsRef.push(upload);
         }
 
@@ -65,11 +103,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Функция для отображения загрузок
+    // Инициализация настроек
+    UploadManager.initGlobalSettingsListener((settings) => {
+        globalSettings = settings;
+        photoLimitInput.value = settings.photoLimit;
+        textLimitInput.value = settings.textLimit;
+        disableImageUploadCheckbox.checked = settings.imageUploadDisabled;
+        disableTextUploadCheckbox.checked = settings.textUploadDisabled;
+    });
+
+    // Рендер загрузок
     function renderUploads(uploadsList) {
         uploads = uploadsList;
-        const uploadsContainer = document.getElementById('uploads-list');
-        uploadsContainer.innerHTML = '';
+        uploadsList.innerHTML = '';
 
         uploadsList.forEach(upload => {
             const uploadItem = document.createElement('div');
@@ -92,7 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 uploadItem.appendChild(textContent);
             }
 
-            uploadsContainer.appendChild(uploadItem);
+            uploadsList.appendChild(uploadItem);
         });
     }
 
@@ -223,6 +269,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
+   applyLimitsBtn.addEventListener('click', () => {
+        const newSettings = {
+            photoLimit: parseInt(photoLimitInput.value),
+            textLimit: parseInt(textLimitInput.value),
+            imageUploadDisabled: disableImageUploadCheckbox.checked,
+            textUploadDisabled: disableTextUploadCheckbox.checked
+        };
+
+        UploadManager.saveGlobalSettings(newSettings);
+        alert('Настройки обновлены');
+    });
+
 // Функция для проверки лимитов загрузок (необязательно)
 function checkUploadLimits(uploads, user, type, limit) {
     const userUploads = uploads.filter(upload => 
@@ -231,3 +289,5 @@ function checkUploadLimits(uploads, user, type, limit) {
 
     return userUploads.length < limit;
 }
+
+
