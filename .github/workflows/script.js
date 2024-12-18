@@ -14,6 +14,7 @@ firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Получение элементов
     const loginBtn = document.getElementById('login-btn');
     const usernameInput = document.getElementById('username');
     const passwordInput = document.getElementById('password');
@@ -26,16 +27,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const addTextBtn = document.getElementById('add-text-btn');
     const adminSection = document.getElementById('admin-section');
     const resetUploadsBtn = document.getElementById('reset-uploads-btn');
-    const resetUserLimitsBtn = document.getElementById('reset-user-limits-btn');
     const disableImageUploadCheckbox = document.getElementById('disable-image-upload');
     const disableTextUploadCheckbox = document.getElementById('disable-text-upload');
-    const photoLimitInput = document.getElementById('photo-limit-input');
-    const textLimitInput = document.getElementById('text-limit-input');
-    const applyLimitsBtn = document.getElementById('apply-limits-btn');
     const downloadImagesBtn = document.getElementById('download-images-btn');
     const downloadTextBtn = document.getElementById('download-text-btn');
 
-    // Администраторские credentials
+    // Администраторские данные
     const adminCredentials = {
         username: 'huxnet',
         password: 'dimon131'
@@ -43,107 +40,66 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let currentUser = null;
     let uploads = [];
-    let userLimits = {};
-    let photoLimit = 10; // Значение по умолчанию
-    let textLimit = 10; // Значение по умолчанию
 
     // Класс для управления загрузками
     class UploadManager {
         // Сохранение загрузки
         static saveUpload(upload) {
             const uploadsRef = database.ref('uploads');
-            const newUploadRef = uploadsRef.push();
-            
-            return newUploadRef.set({
-                type: upload.type,
-                content: upload.content,
-                user: upload.user,
-                timestamp: firebase.database.ServerValue.TIMESTAMP
-            });
+            return uploadsRef.push(upload);
         }
 
         // Получение всех загрузок
-        static getAllUploads(callback) {
+        static initUploadsListener(callback) {
             const uploadsRef = database.ref('uploads');
-            
             uploadsRef.on('value', (snapshot) => {
-                const uploads = [];
-                snapshot.forEach((childSnapshot) => {
-                    const upload = childSnapshot.val();
-                    upload.id = childSnapshot.key;
-                    uploads.push(upload);
-                });
-                
-                callback(uploads);
+                const uploadsData = snapshot.val();
+                const uploadsList = uploadsData ? Object.values(uploadsData) : [];
+                callback(uploadsList);
             });
         }
 
-        // Удаление всех загрузок
+        // Сброс всех загрузок
         static resetUploads() {
             return database.ref('uploads').remove();
         }
-
-        // Сохранение лимитов
-        static saveLimits(limits) {
-            return database.ref('limits').set(limits);
-        }
-
-        // Получение лимитов
-        static getLimits(callback) {
-            const limitsRef = database.ref('limits');
-            limitsRef.once('value', (snapshot) => {
-                callback(snapshot.val() || {
-                    photoLimit: 10,
-                    textLimit: 10
-                });
-            });
-        }
     }
 
-    // Инициализация при входе
-    function initializeApp() {
-        // Получаем лимиты
-        UploadManager.getLimits((limits) => {
-            photoLimit = limits.photoLimit;
-            textLimit = limits.textLimit;
-            photoLimitInput.value = photoLimit;
-            textLimitInput.value = textLimit;
-        });
+    // Функция для отображения загрузок
+    function renderUploads(uploadsList) {
+        uploads = uploadsList;
+        const uploadsContainer = document.getElementById('uploads-list');
+        uploadsContainer.innerHTML = '';
 
-        // Загрузка и отображение uploads
-        UploadManager.getAllUploads((loadedUploads) => {
-            uploads = loadedUploads;
-            renderUploads(uploads);
-        });
-    }
+        uploadsList.forEach(upload => {
+            const uploadItem = document.createElement('div');
+            uploadItem.classList.add('upload-item');
 
-    // Рендер загрузок
-    function renderUploads(uploads) {
-        uploadsList.innerHTML = '';
-        uploads.sort((a, b) => b.timestamp - a.timestamp)
-            .forEach(upload => {
-                const uploadItem = document.createElement('div');
-                uploadItem.classList.add('upload-item');
+            const userSpan = document.createElement('div');
+            userSpan.classList.add('username');
+            userSpan.textContent = upload.user;
 
-                const userSpan = document.createElement('span');
-                userSpan.textContent = `От: ${upload.user}`;
+            if (upload.type === 'image') {
+                const img = document.createElement('img');
+                img.src = upload.content;
                 uploadItem.appendChild(userSpan);
+                uploadItem.appendChild(img);
+            } else if (upload.type === 'text') {
+                const textContent = document.createElement('p');
+                textContent.classList.add('text-content');
+                textContent.textContent = upload.content;
+                uploadItem.appendChild(userSpan);
+                uploadItem.appendChild(textContent);
+            }
 
-                if (upload.type === 'image') {
-                    const img = document.createElement('img');
-                    img.src = upload.content;
-                    uploadItem.appendChild(img);
-                } else {
-                    const textContent = document.createElement('p');
-                    textContent.textContent = upload.content;
-                    uploadItem.appendChild(textContent);
-                }
-
-                uploadsList.appendChild(uploadItem);
-            });
+            uploadsContainer.appendChild(uploadItem);
+        });
     }
 
-    // Вход пользователя
+    // Инициализация прослушивателя загрузок
+    UploadManager.initUploadsListener(renderUploads);
+
+    // Обработчик входа
     loginBtn.addEventListener('click', () => {
         const username = usernameInput.value.trim().toLowerCase();
 
@@ -160,7 +116,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 loginContainer.classList.add('hidden');
                 mainContainer.classList.remove('hidden');
                 adminSection.classList.remove('hidden');
-                initializeApp();
                 alert('Вход выполнен как администратор');
             } else if (passwordInput.value !== '') {
                 alert('Неверный пароль');
@@ -170,7 +125,6 @@ document.addEventListener('DOMContentLoaded', () => {
             currentUser = username;
             loginContainer.classList.add('hidden');
             mainContainer.classList.remove('hidden');
-            initializeApp();
             alert(`Добро пожаловать, ${currentUser}`);
         }
     });
@@ -215,53 +169,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 user: currentUser
             });
             textInput.value = '';
+        } else {
+            alert('Введите текст');
         }
     });
 
-   // Сброс загрузок
+    // Сброс всех загрузок
     resetUploadsBtn.addEventListener('click', () => {
         if (confirm('Вы уверены, что хотите сбросить все загрузки?')) {
             UploadManager.resetUploads();
             alert('Все загрузки были сброшены.');
         }
-    });
-
-    // Сброс лимитов
-    resetUserLimitsBtn.addEventListener('click', () => {
-        if (confirm('Вы уверены, что хотите сбросить лимиты для всех пользователей?')) {
-            // Сброс лимитов до значений по умолчанию
-            const defaultLimits = {
-                photoLimit: 10,
-                textLimit: 10
-            };
-            UploadManager.saveLimits(defaultLimits);
-            photoLimit = defaultLimits.photoLimit;
-            textLimit = defaultLimits.textLimit;
-            photoLimitInput.value = photoLimit;
-            textLimitInput.value = textLimit;
-            alert('Лимиты пользователей были сброшены.');
-        }
-    });
-
-    // Применение лимитов
-    applyLimitsBtn.addEventListener('click', () => {
-        const newPhotoLimit = parseInt(photoLimitInput.value);
-        const newTextLimit = parseInt(textLimitInput.value);
-
-        if (isNaN(newPhotoLimit) || isNaN(newTextLimit)) {
-            alert('Введите корректные числовые значения');
-            return;
-        }
-
-        const newLimits = {
-            photoLimit: newPhotoLimit,
-            textLimit: newTextLimit
-        };
-
-        UploadManager.saveLimits(newLimits);
-        photoLimit = newPhotoLimit;
-        textLimit = newTextLimit;
-        alert(`Новые лимиты: Фото - ${photoLimit}, Тексты - ${textLimit}`);
     });
 
     // Скачивание изображений
@@ -273,22 +191,17 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Создание zip-архива
         const zip = new JSZip();
-        
         imageUploads.forEach((image, index) => {
-            // Извлечение base64 данных
-            const base64Data = image.content.split(',')[1];
-            zip.file(`${image.user}-${index + 1}.png`, base64Data, { base64: true });
+            zip.file(`${image.user}-${index + 1}.png`, image.content.split(',')[1], { base64: true });
         });
 
-        // Генерация и скачивание архива
         zip.generateAsync({ type: 'blob' }).then((content) => {
             const a = document.createElement('a');
             a.href = URL.createObjectURL(content);
             a.download = 'images.zip';
             a.click();
-        });
+          });
     });
 
     // Скачивание текстов
@@ -300,10 +213,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Формирование текстового контента
         const texts = textUploads.map(item => `${item.user}: ${item.content}`).join('\n');
         
-        // Создание и скачивание текстового файла
         const blob = new Blob([texts], { type: 'text/plain' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
@@ -312,23 +223,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// Функция для проверки и ограничения загрузок
-function checkUploadLimits(user, type) {
-    // Здесь можно добавить логику проверки лимитов
-    // Например, подсчет количества загрузок пользователя
+// Функция для проверки лимитов загрузок (необязательно)
+function checkUploadLimits(uploads, user, type, limit) {
     const userUploads = uploads.filter(upload => 
         upload.user === user && upload.type === type
     );
 
-    if (type === 'image' && userUploads.length >= photoLimit) {
-        alert(`Вы достигли лимита в ${photoLimit} изображений`);
-        return false;
-    }
-
-    if (type === 'text' && userUploads.length >= textLimit) {
-        alert(`Вы достигли лимита в ${textLimit} текстовых сообщений`);
-        return false;
-    }
-
-    return true;
+    return userUploads.length < limit;
 }
