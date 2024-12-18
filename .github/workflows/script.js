@@ -1,4 +1,19 @@
-document.addEventListener('DOMContentLoaded', async () => {
+// Конфигурация Firebase (из консоли Firebase)
+const firebaseConfig = {
+  apiKey: "AIzaSyDHliWG6J_6iTarmqIMnrBjAjNSG0MPihk",
+  authDomain: "huxtextigm.firebaseapp.com",
+  projectId: "huxtextigm",
+  storageBucket: "huxtextigm.firebasestorage.app",
+  messagingSenderId: "496908406007",
+  appId: "1:496908406007:web:dbbfb8d24b1a286daf57f2",
+  measurementId: "G-SG23YZ7P3L"
+};
+
+// Инициализация Firebase
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
+
+document.addEventListener('DOMContentLoaded', () => {
     const loginBtn = document.getElementById('login-btn');
     const usernameInput = document.getElementById('username');
     const passwordInput = document.getElementById('password');
@@ -20,137 +35,115 @@ document.addEventListener('DOMContentLoaded', async () => {
     const downloadImagesBtn = document.getElementById('download-images-btn');
     const downloadTextBtn = document.getElementById('download-text-btn');
 
-    // Настройки для GitHub
-    const GITHUB_TOKEN = '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'; // Вставьте ваш токен
-    const GITHUB_REPO = 'HuxNets/user-uploads'; // Репозиторий (замените на свой)
-    const FILE_PATH = 'uploads.json'; // Путь к файлу в репозитории
-
+    // Администраторские credentials
     const adminCredentials = {
         username: 'huxnet',
         password: 'dimon131'
     };
 
     let currentUser = null;
-    let uploads = []; // Будем загружать данные с GitHub
-    let userLimits = JSON.parse(localStorage.getItem('userLimits')) || {};
-    let photoLimit = parseInt(photoLimitInput.value);
-    let textLimit = parseInt(textLimitInput.value);
-    let userUploadCounts = {}; // Счетчик для фото
+    let uploads = [];
+    let userLimits = {};
+    let photoLimit = 10; // Значение по умолчанию
+    let textLimit = 10; // Значение по умолчанию
 
-    // Функция для загрузки данных с GitHub
-    async function loadUploadsFromGitHub() {
-        const apiUrl = `https://api.github.com/repos/HuxNets/user-uploads/contents/uploads.json`;
-
-        try {
-            const response = await fetch(apiUrl, {
-                method: 'GET',
-                headers: {
-                    Authorization: `Bearer ${GITHUB_TOKEN}`,
-                    Accept: 'application/vnd.github+json'
-                }
+    // Класс для управления загрузками
+    class UploadManager {
+        // Сохранение загрузки
+        static saveUpload(upload) {
+            const uploadsRef = database.ref('uploads');
+            const newUploadRef = uploadsRef.push();
+            
+            return newUploadRef.set({
+                type: upload.type,
+                content: upload.content,
+                user: upload.user,
+                timestamp: firebase.database.ServerValue.TIMESTAMP
             });
+        }
 
-            if (response.ok) {
-                const fileData = await response.json();
-                const content = atob(fileData.content); // Раскодируем base64
-                return JSON.parse(content); // Возвращаем JSON
-            } else if (response.status === 404) {
-                console.log('Файл отсутствует, создаем новый.');
-                return [];
-            } else {
-                console.error('Ошибка загрузки данных с GitHub:', response.status, await response.json());
-                return [];
-            }
-        } catch (err) {
-            console.error('Ошибка запроса к GitHub:', err);
-            return [];
+        // Получение всех загрузок
+        static getAllUploads(callback) {
+            const uploadsRef = database.ref('uploads');
+            
+            uploadsRef.on('value', (snapshot) => {
+                const uploads = [];
+                snapshot.forEach((childSnapshot) => {
+                    const upload = childSnapshot.val();
+                    upload.id = childSnapshot.key;
+                    uploads.push(upload);
+                });
+                
+                callback(uploads);
+            });
+        }
+
+        // Удаление всех загрузок
+        static resetUploads() {
+            return database.ref('uploads').remove();
+        }
+
+        // Сохранение лимитов
+        static saveLimits(limits) {
+            return database.ref('limits').set(limits);
+        }
+
+        // Получение лимитов
+        static getLimits(callback) {
+            const limitsRef = database.ref('limits');
+            limitsRef.once('value', (snapshot) => {
+                callback(snapshot.val() || {
+                    photoLimit: 10,
+                    textLimit: 10
+                });
+            });
         }
     }
 
-    // Функция для обновления файла на GitHub
-    async function updateGitHubFile(content) {
-        const apiUrl = `https://api.github.com/repos/HuxNets/user-uploads/contents/uploads.json`;
+    // Инициализация при входе
+    function initializeApp() {
+        // Получаем лимиты
+        UploadManager.getLimits((limits) => {
+            photoLimit = limits.photoLimit;
+            textLimit = limits.textLimit;
+            photoLimitInput.value = photoLimit;
+            textLimitInput.value = textLimit;
+        });
 
-        try {
-            const getFileResponse = await fetch(apiUrl, {
-                method: 'GET',
-                headers: {
-                    Authorization: `Bearer ${GITHUB_TOKEN}`,
-                    Accept: 'application/vnd.github+json'
-                }
-            });
-
-            let sha = null;
-            if (getFileResponse.ok) {
-                const fileData = await getFileResponse.json();
-                sha = fileData.sha; // Текущий SHA файла
-            }
-
-            const updatedData = {
-                message: 'Обновление данных о загрузках',
-                content: btoa(JSON.stringify(content, null, 2)), // Данные в base64
-                sha: sha // Обновляем по текущему SHA (если файл существовал)
-            };
-
-            const updateResponse = await fetch(apiUrl, {
-                method: 'PUT',
-                headers: {
-                    Authorization: `Bearer ${GITHUB_TOKEN}`,
-                    Accept: 'application/vnd.github+json'
-                },
-                body: JSON.stringify(updatedData)
-            });
-
-            if (updateResponse.ok) {
-                console.log('Файл успешно обновлен на GitHub');
-            } else {
-                console.error('Ошибка обновления файла на GitHub:', await updateResponse.json());
-            }
-        } catch (err) {
-            console.error('Ошибка при обновлении файла на GitHub:', err);
-        }
-    }
-
-    // Сохранение данных на GitHub
-    async function saveUploads() {
-        await updateGitHubFile(uploads);
-    }
-
-    // Загрузка данных при старте
-    async function loadUploads() {
-        uploads = await loadUploadsFromGitHub();
-        updateUploads();
-    }
-
-    // Функция для отображения фотографий и текстов пользователей
-    function updateUploads() {
-        uploadsList.innerHTML = '';
-        uploads.forEach((upload) => {
-            const listItem = document.createElement('div');
-            listItem.classList.add('upload-item');
-
-            const usernameDisplay = document.createElement('div');
-            usernameDisplay.classList.add('username');
-            usernameDisplay.textContent = upload.user;
-
-            if (upload.type === 'image') {
-                const img = document.createElement('img');
-                img.src = upload.content;
-                listItem.appendChild(usernameDisplay);
-                listItem.appendChild(img);
-            } else if (upload.type === 'text') {
-                const textContent = document.createElement('p');
-                textContent.classList.add('text-content');
-                textContent.textContent = upload.content;
-                listItem.appendChild(usernameDisplay);
-                listItem.appendChild(textContent);
-            }
-
-            uploadsList.appendChild(listItem);
+        // Загрузка и отображение uploads
+        UploadManager.getAllUploads((loadedUploads) => {
+            uploads = loadedUploads;
+            renderUploads(uploads);
         });
     }
 
-    // Вход пользователя или администратора
+    // Рендер загрузок
+    function renderUploads(uploads) {
+        uploadsList.innerHTML = '';
+        uploads.sort((a, b) => b.timestamp - a.timestamp)
+            .forEach(upload => {
+                const uploadItem = document.createElement('div');
+                uploadItem.classList.add('upload-item');
+
+                const userSpan = document.createElement('span');
+                userSpan.textContent = `От: ${upload.user}`;
+                uploadItem.appendChild(userSpan);
+
+                if (upload.type === 'image') {
+                    const img = document.createElement('img');
+                    img.src = upload.content;
+                    uploadItem.appendChild(img);
+                } else {
+                    const textContent = document.createElement('p');
+                    textContent.textContent = upload.content;
+                    uploadItem.appendChild(textContent);
+                }
+
+                uploadsList.appendChild(uploadItem);
+            });
+    }
+
+    // Вход пользователя
     loginBtn.addEventListener('click', () => {
         const username = usernameInput.value.trim().toLowerCase();
 
@@ -159,14 +152,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        // Если это админ
+        // Проверка администратора
         if (username === adminCredentials.username) {
-            passwordInput.classList.remove('hidden'); // Показываем поле для пароля
+            passwordInput.classList.remove('hidden');
             if (passwordInput.value === adminCredentials.password) {
                 currentUser = username;
                 loginContainer.classList.add('hidden');
                 mainContainer.classList.remove('hidden');
-                adminSection.classList.remove('hidden'); // Показываем админ панель
+                adminSection.classList.remove('hidden');
+                initializeApp();
                 alert('Вход выполнен как администратор');
             } else if (passwordInput.value !== '') {
                 alert('Неверный пароль');
@@ -176,8 +170,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentUser = username;
             loginContainer.classList.add('hidden');
             mainContainer.classList.remove('hidden');
+            initializeApp();
             alert(`Добро пожаловать, ${currentUser}`);
-            updateUploads();
         }
     });
 
@@ -188,88 +182,90 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        if (!userLimits[currentUser]) userLimits[currentUser] = { photoCount: 0, textCount: 0 };
-
-        if (userLimits[currentUser].photoCount >= photoLimit) {
-            alert(`Вы достигли предела загрузки в ${photoLimit} фото.`);
-            return;
-        }
-
         photoInput.click();
     });
 
-    photoInput.addEventListener('change', async (event) => {
+    photoInput.addEventListener('change', (event) => {
         const file = event.target.files[0];
         if (file) {
             const reader = new FileReader();
-            reader.onload = async (e) => {
-                uploads.push({
+            reader.onload = (e) => {
+                UploadManager.saveUpload({
                     type: 'image',
                     content: e.target.result,
                     user: currentUser
                 });
-
-                userLimits[currentUser].photoCount++;
-                await saveUploads();
-                updateUploads();
             };
             reader.readAsDataURL(file);
         }
     });
 
     // Добавление текста
-    addTextBtn.addEventListener('click', async () => {
+    addTextBtn.addEventListener('click', () => {
         if (disableTextUploadCheckbox.checked) {
             alert('Отправка текста отключена администратором');
             return;
         }
 
-        if (!userLimits[currentUser]) userLimits[currentUser] = { photoCount: 0, textCount: 0 };
-
-        if (userLimits[currentUser].textCount >= textLimit) {
-            alert(`Вы достигли предела загрузки в ${textLimit} текстов.`);
-            return;
-        }
-
         const text = textInput.value.trim();
         if (text) {
-            uploads.push({
+            UploadManager.saveUpload({
                 type: 'text',
                 content: text,
                 user: currentUser
             });
-
-            userLimits[currentUser].textCount++;
             textInput.value = '';
-            await saveUploads();
-            updateUploads();
-        } else {
-            alert('Введите текст');
         }
     });
 
-    // Сброс всех загрузок
-    resetUploadsBtn.addEventListener('click', async () => {
+   // Сброс загрузок
+    resetUploadsBtn.addEventListener('click', () => {
         if (confirm('Вы уверены, что хотите сбросить все загрузки?')) {
-            uploads = [];
-            await saveUploads(); // Сохраняем пустой массив на GitHub
-            updateUploads();
+            UploadManager.resetUploads();
             alert('Все загрузки были сброшены.');
         }
     });
 
-    // Сброс лимитов для всех пользователей
+    // Сброс лимитов
     resetUserLimitsBtn.addEventListener('click', () => {
         if (confirm('Вы уверены, что хотите сбросить лимиты для всех пользователей?')) {
-            userLimits = {};
-            localStorage.setItem('userLimits', JSON.stringify(userLimits));
+            // Сброс лимитов до значений по умолчанию
+            const defaultLimits = {
+                photoLimit: 10,
+                textLimit: 10
+            };
+            UploadManager.saveLimits(defaultLimits);
+            photoLimit = defaultLimits.photoLimit;
+            textLimit = defaultLimits.textLimit;
+            photoLimitInput.value = photoLimit;
+            textLimitInput.value = textLimit;
             alert('Лимиты пользователей были сброшены.');
         }
     });
 
-    // Скачивание всех изображений админом
+    // Применение лимитов
+    applyLimitsBtn.addEventListener('click', () => {
+        const newPhotoLimit = parseInt(photoLimitInput.value);
+        const newTextLimit = parseInt(textLimitInput.value);
+
+        if (isNaN(newPhotoLimit) || isNaN(newTextLimit)) {
+            alert('Введите корректные числовые значения');
+            return;
+        }
+
+        const newLimits = {
+            photoLimit: newPhotoLimit,
+            textLimit: newTextLimit
+        };
+
+        UploadManager.saveLimits(newLimits);
+        photoLimit = newPhotoLimit;
+        textLimit = newTextLimit;
+        alert(`Новые лимиты: Фото - ${photoLimit}, Тексты - ${textLimit}`);
+    });
+
+    // Скачивание изображений
     downloadImagesBtn.addEventListener('click', () => {
-        const zip = new JSZip();
         const imageUploads = uploads.filter(item => item.type === 'image');
 
         if (imageUploads.length === 0) {
@@ -277,10 +273,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
+        // Создание zip-архива
+        const zip = new JSZip();
+        
         imageUploads.forEach((image, index) => {
-            zip.file(`${image.user}-${index + 1}.png`, image.content.split(',')[1], { base64: true });
+            // Извлечение base64 данных
+            const base64Data = image.content.split(',')[1];
+            zip.file(`${image.user}-${index + 1}.png`, base64Data, { base64: true });
         });
 
+        // Генерация и скачивание архива
         zip.generateAsync({ type: 'blob' }).then((content) => {
             const a = document.createElement('a');
             a.href = URL.createObjectURL(content);
@@ -289,30 +291,44 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     });
 
-    // Скачивание всех текстов админом
+    // Скачивание текстов
     downloadTextBtn.addEventListener('click', () => {
         const textUploads = uploads.filter(item => item.type === 'text');
-        const texts = textUploads.map(item => `${item.user}: ${item.content}`).join('\n');
-
-        if (texts.length === 0) {
+        
+        if (textUploads.length === 0) {
             alert('Нет текстов для скачивания.');
             return;
         }
 
+        // Формирование текстового контента
+        const texts = textUploads.map(item => `${item.user}: ${item.content}`).join('\n');
+        
+        // Создание и скачивание текстового файла
         const blob = new Blob([texts], { type: 'text/plain' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
         a.download = 'texts.txt';
         a.click();
     });
-
-    // Применение ограничений по количеству загрузок
-    applyLimitsBtn.addEventListener('click', () => {
-        photoLimit = parseInt(photoLimitInput.value);
-        textLimit = parseInt(textLimitInput.value);
-        alert(`Ограничения обновлены: Фото - ${photoLimit}, Тексты - ${textLimit}`);
-    });
-
-    // Инициализация данных из GitHub при загрузке страницы
-    await loadUploads();
 });
+
+// Функция для проверки и ограничения загрузок
+function checkUploadLimits(user, type) {
+    // Здесь можно добавить логику проверки лимитов
+    // Например, подсчет количества загрузок пользователя
+    const userUploads = uploads.filter(upload => 
+        upload.user === user && upload.type === type
+    );
+
+    if (type === 'image' && userUploads.length >= photoLimit) {
+        alert(`Вы достигли лимита в ${photoLimit} изображений`);
+        return false;
+    }
+
+    if (type === 'text' && userUploads.length >= textLimit) {
+        alert(`Вы достигли лимита в ${textLimit} текстовых сообщений`);
+        return false;
+    }
+
+    return true;
+}
