@@ -1,3 +1,5 @@
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js';
+import { getDatabase, ref, set, push, onValue, remove } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js';
 // Конфигурация Firebase (из консоли Firebase)
 const firebaseConfig = {
   apiKey: "AIzaSyDHliWG6J_6iTarmqIMnrBjAjNSG0MPihk",
