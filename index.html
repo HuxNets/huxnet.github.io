@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Пользовательская панель</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="login-container">
+        <h1>Вход</h1>
+        <input type="text" id="username" placeholder="Введите имя пользователя">
+        <input type="password" id="password" placeholder="Введите пароль" class="hidden">
+        <button id="login-btn">Вход</button>
+    </div>
+
+    <div class="container hidden">
+        <!-- Левая часть: Загрузки пользователей -->
+        <div class="user-content">
+            <h1>Загрузки пользователей</h1>
+            <div id="uploads-list"></div>
+        </div>
+
+        <!-- Правая часть: Панель пользователя -->
+        <div class="user-panel">
+            <h1>Панель пользователя</h1>
+            <div id="user-options">
+                <button id="upload-photo-btn">Загрузить фото</button>
+                <input type="file" id="photo-input" accept="image/*" class="hidden">
+                <textarea id="text-input" rows="4" placeholder="Введите текст"></textarea>
+                <button id="add-text-btn">Добавить текст</button>
+            </div>
+            
+            <!-- Админ панель (будет скрыта для обычных пользователей) -->
+            <div id="admin-section" class="hidden">
+                <h1>Админ Панель</h1>
+                <div id="admin-options">
+                    <button id="download-images-btn">Скачать все изображения</button>
+                    <button id="download-text-btn">Скачать все тексты</button>
+                    <button id="reset-uploads-btn">Сбросить все загрузки</button>
+                    <button id="reset-user-limits-btn">Сбросить лимиты пользователей</button>
+
+                    <div>
+                        <label>
+                            <input type="checkbox" id="disable-image-upload"> Запретить загрузку изображений
+                        </label>
+                    </div>
+                    <div>
+                        <label>
+                            <input type="checkbox" id="disable-text-upload"> Запретить отправку текста
+                        </label>
+                    </div>
+                    <div>
+                        <label>Ограничение на загрузку фото (макс): </label>
+                        <input type="number" id="photo-limit-input" value="3" min="1">
+                    </div>
+                    <div>
+                        <label>Ограничение на загрузку текстов (макс): </label>
+                        <input type="number" id="text-limit-input" value="3" min="1">
+                    </div>
+                    <button id="apply-limits-btn">Применить ограничения</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
