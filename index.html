@@ -19,15 +19,10 @@
     <div class="container">
         <header class="text-center my-4">
             <div class="d-flex justify-content-center align-items-center position-relative">
+                <a href="analizator.html" class="btn btn-primary position-absolute start-0">Анализатор YouTube</a>
                 <h1 class="title animate__animated animate__fadeInDown m-0">
                     <i class="fas fa-stream me-2"></i> Трекер Стримеров
                 </h1>
-                <div class="notification-control animate__animated animate__fadeIn position-absolute end-0">
-                    <button id="enableNotifications" class="btn btn-notification">
-                        <i class="fas fa-bell me-2"></i> Уведомления
-                    </button>
-                    <div id="notificationStatus" class="notification-status"></div>
-                </div>
             </div>
         </header>
         
@@ -62,20 +57,31 @@
             </div>
         </div>
         
-        <div id="notificationToast" class="toast-container position-fixed top-0 end-0 p-3">
-            <div class="toast align-items-center text-white bg-success" role="alert" aria-live="assertive" aria-atomic="true">
-                <div class="d-flex">
-                    <div class="toast-body"></div>
-                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-                </div>
-            </div>
-        </div>
-        
         <div class="row g-4" id="streamersContainer"></div>
     </div>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js"></script>
     <script src="script.js"></script>
     
+    <script>
+        // Защита от просмотра кода
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && (e.keyCode === 85 || e.keyCode === 117)) {
+                e.preventDefault();
+                window.location.href = "about:blank";
+            }
+            if (e.keyCode === 123) {
+                e.preventDefault();
+                window.location.href = "about:blank";
+            }
+        });
+        
+        document.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+            return false;
+        });
+    </script>
 </body>
 </html>
