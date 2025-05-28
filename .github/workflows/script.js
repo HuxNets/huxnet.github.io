@@ -10,14 +10,8 @@ const firebaseConfig = {
     measurementId: "G-K3JG0FBLQK"
 };
 
-// Инициализация Firebase (с проверкой)
-let app;
-try {
-    app = firebase.apps.length ? firebase.app() : firebase.initializeApp(firebaseConfig);
-} catch (e) {
-    console.error("Ошибка инициализации Firebase:", e);
-}
-
+// Инициализация Firebase
+firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 const userId = "shared_global_user"; // Общий ID для всех пользователей
 
@@ -49,8 +43,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         initAnimatedBackground();
         await authenticateWithTwitch();
         
-        // Инициализация Firebase и загрузка данных
-        await initFirebase();
+        // Загружаем данные из Firebase
+        await loadInitialData();
         
         // Устанавливаем активную кнопку сортировки
         sortButtons.forEach(btn => {
@@ -58,8 +52,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 btn.classList.add('active');
             }
         });
-        
-        await loadTrackedStreamers();
         
         // Обработчики событий
         addStreamerBtn.addEventListener('click', addStreamer);
@@ -72,24 +64,26 @@ document.addEventListener('DOMContentLoaded', async () => {
                 sortButtons.forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 currentSort = btn.dataset.sort;
+                saveToFirebase('currentSort', currentSort);
                 loadTrackedStreamers();
             });
         });
+        
+        // Периодическое обновление данных (каждую минуту)
+        setInterval(() => {
+            if (trackedStreamers.length > 0) {
+                loadTrackedStreamers();
+            }
+        }, 60000);
+        
     } catch (error) {
         console.error('Ошибка инициализации:', error);
     }
 });
 
-// Инициализация Firebase
-async function initFirebase() {
+// Загрузка начальных данных из Firebase
+async function loadInitialData() {
     try {
-        // Инициализация Firebase
-        const app = firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
-        
-        // Используем фиксированный userId для всех пользователей
-        userId = "_user";  // Общий ID для всех пользователей
-        
         // Загружаем список стримеров
         const streamersRef = database.ref(`users/${userId}/trackedStreamers`);
         streamersRef.on('value', (snapshot) => {
@@ -109,7 +103,7 @@ async function initFirebase() {
             });
         });
     } catch (error) {
-        console.error('Ошибка инициализации Firebase:', error);
+        console.error('Ошибка загрузки данных из Firebase:', error);
     }
 }
 
@@ -324,7 +318,7 @@ async function loadTrackedStreamers() {
         
         await updateLastStreamsData(streamersInfo, streamsInfo, videosInfo);
         
-        const sortedStreamers = sortStreamers(trackedStreamers, streamersInfo, streamsInfo, currentSort);
+        const sortedStreamers = await sortStreamers(trackedStreamers, streamersInfo, streamsInfo, currentSort);
         
         // Очищаем контейнер перед загрузкой
         streamersContainer.innerHTML = '';
@@ -397,7 +391,7 @@ async function updateLastStreamsData(streamersInfo, streamsInfo, videosInfo) {
             streamerData.duration = lastVideo.duration || "";
         }
         
-        updates[`users/shared_global_user/streamersData/${login}`] = streamerData;
+        updates[`users/${userId}/streamersData/${login}`] = streamerData;
     });
     
     try {
@@ -408,7 +402,7 @@ async function updateLastStreamsData(streamersInfo, streamsInfo, videosInfo) {
 }
 
 // Сортировка стримеров
-function sortStreamers(logins, streamersInfo, streamsInfo, sortBy) {
+async function sortStreamers(logins, streamersInfo, streamsInfo, sortBy) {
     const onlineStreamers = logins.filter(login => 
         streamsInfo.some(s => s.user_login.toLowerCase() === login.toLowerCase())
     );
@@ -467,7 +461,7 @@ function sortStreamers(logins, streamersInfo, streamsInfo, sortBy) {
     });
     
     // Возвращаем объединенный массив (онлайн + оффлайн)
-    return [...sortedOnline, ...sortedOffline];
+    return [...sortedOnline, ...(await Promise.all(sortedOffline)).flat()];
 }
 
 function createStreamerCard(streamer, stream, videos) {
@@ -553,7 +547,7 @@ function createStreamerCard(streamer, stream, videos) {
                                     <span class="ms-2"><i class="fas fa-hourglass-half me-1"></i> Длительность: ${formatStreamDuration(stream.started_at)}</span>
                                 </div>` :
                                 lastStreamDate ? 
-                                    `<i class="far fa-clock me-1"></i> Последний стрим: ${formatDate(lastStreamDate)}${timeSinceEnd ? ` (был ${timeSinceEnd})` : ''}` :
+                                    `<i class="far fa-clock me-1"></i> Последний стрим: ${formatDate(lastStreamDate)}${timeSinceEnd ? ` (закончился ${timeSinceEnd})` : ''}` :
                                     `<i class="far fa-clock me-1"></i> Данные о стримах отсутствуют`
                             }
                         </div>
@@ -696,16 +690,16 @@ async function checkForStatusChanges() {
                 const viewerCount = currentData[login]?.viewerCount || 0;
                 
                 if (currentStatus === 'online') {
-                    const message = `[🎮 ${streamerName} начал стрим!](https://twitch.tv/${login})\n\n` +
+                    const message = `[🟢 ${streamerName} начал стрим!](https://twitch.tv/${login})\n\n` +
                                     `📺 *Название:* ${title}\n` +
-                                    `🎲 *Игра:* ${gameName}\n` +
+                                    `🎲 *Категория:* ${gameName}\n` +
                                     `👥 *Зрителей:* ${formatNumber(viewerCount)}`;
                     
                     await sendTelegramNotification(message);
                 } else if (currentStatus === 'offline') {
                     const message = `[🔴 ${streamerName} закончил стрим](https://twitch.tv/${login})\n\n` +
                                     `📺 *Последний стрим:* ${title}\n` +
-                                    `🎲 *Игра:* ${gameName}`;
+                                    `🎲 *Категория:* ${gameName}`;
                     
                     await sendTelegramNotification(message);
                 }
@@ -813,13 +807,6 @@ function getTimeSince(dateString) {
 function formatNumber(num) {
     return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 }
-
-// Периодическое обновление данных (каждую минуту)
-setInterval(() => {
-    if (trackedStreamers.length > 0) {
-        loadTrackedStreamers();
-    }
-}, 60000);
 
 // Обновление при возвращении на вкладку
 document.addEventListener('visibilitychange', () => {
