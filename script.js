@@ -727,27 +727,78 @@ async function checkForStatusChanges() {
         for (const login in currentData) {
             const currentStatus = currentData[login]?.lastStatus;
             const previousStatus = previousData[login]?.lastStatus;
+            const streamerName = currentData[login]?.displayName || login;
+            const gameName = currentData[login]?.gameName || 'Unknown Game';
+            const title = currentData[login]?.lastStreamTitle || 'No title';
+            const currentViewers = currentData[login]?.viewerCount || 0;
+            const previousViewers = previousData[login]?.viewerCount || 0;
+            const streamStart = currentData[login]?.lastStreamDate;
             
             // Если статус изменился
             if (currentStatus && previousStatus && currentStatus !== previousStatus) {
-                const streamerName = currentData[login]?.displayName || login;
-                const gameName = currentData[login]?.gameName || 'Unknown Game';
-                const title = currentData[login]?.lastStreamTitle || 'No title';
-                const viewerCount = currentData[login]?.viewerCount || 0;
-                
                 if (currentStatus === 'online') {
-                    const message = `[🟢 ${streamerName} начал стрим!](https://twitch.tv/${login})\n\n` +
-                                    `📺 *Название:* ${title}\n` +
-                                    `🎲 *Категория:* ${gameName}\n` +
-                                    `👥 *Зрителей:* ${formatNumber(viewerCount)}`;
+                    // Отправляем новое уведомление о начале стрима
+                    const message = `🟢 *${streamerName} начал стрим!*\n\n` +
+                                   `📺 *Название:* ${title}\n` +
+                                   `🎮 *Игра:* ${gameName}\n` +
+                                   `👥 *Зрителей:* ${formatNumber(currentViewers)}\n` +
+                                   `⏱ *Длительность:* ${formatStreamDuration(streamStart)}\n\n` +
+                                   `[Смотреть на Twitch](https://twitch.tv/${login})`;
                     
-                    await sendTelegramNotification(message);
+                    const response = await sendTelegramNotification(message);
+                    if (response.ok) {
+                        const data = await response.json();
+                        lastNotificationIds[login] = data.result.message_id;
+                    }
                 } else if (currentStatus === 'offline') {
-                    const message = `[🔴 ${streamerName} закончил стрим](https://twitch.tv/${login})\n\n` +
-                                    `📺 *Последний стрим:* ${title}\n` +
-                                    `🎲 *Категория:* ${gameName}`;
+                    // Удаляем предыдущее уведомление, если оно есть
+                    if (lastNotificationIds[login]) {
+                        await deleteTelegramNotification(lastNotificationIds[login]);
+                        delete lastNotificationIds[login];
+                    }
+                    
+                    // Получаем информацию о последнем стриме
+                    const videosResponse = await fetch(`https://api.twitch.tv/helix/videos?user_id=${currentData[login].userId}&type=archive&first=1`, {
+                        headers: {
+                            'Client-ID': CLIENT_ID,
+                            'Authorization': `Bearer ${accessToken}`
+                        }
+                    });
+                    
+                    const videosData = await videosResponse.json();
+                    const lastVideo = videosData.data?.[0];
+                    const duration = lastVideo?.duration ? formatDuration(lastVideo.duration) : 'неизвестно';
+                    const finalTitle = lastVideo?.title || title;
+                    
+                    // Отправляем новое уведомление о завершении
+                    const message = `🔴 *${streamerName} закончил стрим*\n\n` +
+                                   `📺 *Название:* ${finalTitle}\n` +
+                                   `🎮 *Игра:* ${gameName}\n` +
+                                   `⏱ *Длительность:* ${duration}\n` +
+                                   `👥 *Макс. зрителей:* ${formatNumber(previousData[login]?.peakViewers || previousViewers)}\n\n` +
+                                   `[Канал на Twitch](https://twitch.tv/${login})`;
                     
                     await sendTelegramNotification(message);
+                }
+            } 
+            // Если стрим продолжается и есть изменения
+            else if (currentStatus === 'online' && previousStatus === 'online') {
+                const titleChanged = currentData[login]?.lastStreamTitle !== previousData[login]?.lastStreamTitle;
+                const viewersChanged = currentViewers !== previousViewers;
+                
+                // Если есть значительные изменения (название или зрители)
+                if (titleChanged || viewersChanged) {
+                    // Редактируем существующее сообщение
+                    if (lastNotificationIds[login]) {
+                        const message = `🟢 *${streamerName} в эфире!*\n\n` +
+                                       `📺 *Название:* ${title}\n` +
+                                       `🎮 *Игра:* ${gameName}\n` +
+                                       `👥 *Зрителей:* ${formatNumber(currentViewers)}\n` +
+                                       `⏱ *Длительность:* ${formatStreamDuration(streamStart)}\n\n` +
+                                       `[Смотреть на Twitch](https://twitch.tv/${login})`;
+                        
+                        await editTelegramNotification(lastNotificationIds[login], message);
+                    }
                 }
             }
         }
@@ -759,10 +810,49 @@ async function checkForStatusChanges() {
     }
 }
 
-// Отправка уведомления в Telegram
+// Функция редактирования сообщения в Telegram
+async function editTelegramNotification(messageId, newText) {
+    try {
+        await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/editMessageText`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                chat_id: TELEGRAM_CHAT_ID,
+                message_id: messageId,
+                text: newText,
+                parse_mode: 'Markdown',
+                disable_web_page_preview: false
+            })
+        });
+    } catch (error) {
+        console.error('Ошибка редактирования уведомления:', error);
+    }
+}
+
+// Функция удаления сообщения в Telegram
+async function deleteTelegramNotification(messageId) {
+    try {
+        await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/deleteMessage`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                chat_id: TELEGRAM_CHAT_ID,
+                message_id: messageId
+            })
+        });
+    } catch (error) {
+        console.error('Ошибка удаления уведомления:', error);
+    }
+}
+
+// Модифицированная функция отправки уведомления (теперь возвращает response)
 async function sendTelegramNotification(message) {
     try {
-        await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        return await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -776,6 +866,7 @@ async function sendTelegramNotification(message) {
         });
     } catch (error) {
         console.error('Ошибка отправки уведомления в Telegram:', error);
+        return { ok: false };
     }
 }
 
