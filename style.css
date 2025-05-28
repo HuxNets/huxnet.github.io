@@ -55,37 +55,20 @@ body {
     margin-bottom: 0;
 }
 
-/* Управление уведомлениями */
-.notification-control {
-    margin-top: 0;
-}
-
-.btn-notification {
-    background: rgba(255, 255, 255, 0.1);
+.btn-primary {
+    background: linear-gradient(45deg, var(--primary), var(--secondary));
     border: none;
     border-radius: 50px;
     color: white;
     padding: 10px 20px;
     font-weight: 600;
     transition: all 0.3s ease;
-    backdrop-filter: blur(5px);
+    box-shadow: 0 4px 15px rgba(157, 101, 201, 0.3);
 }
 
-.btn-notification:hover {
-    background: rgba(255, 255, 255, 0.2);
+.btn-primary:hover {
     transform: translateY(-2px);
-}
-
-.notification-status {
-    margin-top: 10px;
-    font-size: 0.9rem;
-    color: var(--success);
-    text-align: right;
-}
-
-/* Toast уведомления */
-.toast-container {
-    z-index: 9999;
+    box-shadow: 0 6px 20px rgba(157, 101, 201, 0.4);
 }
 
 /* Поиск */
@@ -356,11 +339,6 @@ body {
     
     .btn-add {
         width: 100%;
-    }
-    
-    .notification-control {
-        position: static !important;
-        margin-top: 15px;
     }
     
     body {
