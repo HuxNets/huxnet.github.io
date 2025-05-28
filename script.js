@@ -31,8 +31,6 @@ const errorMessage = document.getElementById('errorMessage');
 const deleteAllBtn = document.getElementById('deleteAllBtn');
 const sortButtons = document.querySelectorAll('.btn-sort');
 const notificationToast = new bootstrap.Toast(document.querySelector('.toast'));
-const lastNotificationIds = {};
-
 
 // Переменные состояния
 let trackedStreamers = [];
@@ -385,7 +383,7 @@ async function loadTrackedStreamers() {
         const sortedStreamers = [...sortedOnline, ...sortedOffline];
         
         // Сохраняем отсортированный список в базу данных
-        await saveToFirebase('trackedStreamers', sortedStreamers); // <-- ВОТ СЮДА
+        await saveToFirebase('trackedStreamers', sortedStreamers);
         
         // Очищаем контейнер перед загрузкой
         streamersContainer.innerHTML = '';
@@ -406,7 +404,6 @@ async function loadTrackedStreamers() {
         console.error('Ошибка загрузки данных:', error);
     }
 }
-
 
 // Обновление данных о последних стримах
 async function updateLastStreamsData(streamersInfo, streamsInfo, videosInfo) {
@@ -447,69 +444,6 @@ async function updateLastStreamsData(streamersInfo, streamsInfo, videosInfo) {
     } catch (error) {
         console.error('Ошибка обновления данных в Firebase:', error);
     }
-}
-
-// Сортировка стримеров
-async function sortStreamers(logins, streamersInfo, streamsInfo, sortBy) {
-    const onlineStreamers = logins.filter(login => 
-        streamsInfo.some(s => s.user_login.toLowerCase() === login.toLowerCase())
-    );
-    
-    const offlineStreamers = logins.filter(login => 
-        !streamsInfo.some(s => s.user_login.toLowerCase() === login.toLowerCase())
-    );
-    
-    // Сначала сортируем онлайн стримеров
-    const sortedOnline = [...onlineStreamers].sort((a, b) => {
-        const streamerA = streamersInfo.find(s => s.login.toLowerCase() === a.toLowerCase());
-        const streamerB = streamersInfo.find(s => s.login.toLowerCase() === b.toLowerCase());
-        const streamA = streamsInfo.find(s => s.user_login.toLowerCase() === a.toLowerCase());
-        const streamB = streamsInfo.find(s => s.user_login.toLowerCase() === b.toLowerCase());
-        
-        switch(sortBy) {
-            case 'name':
-                return streamerA.display_name.localeCompare(streamerB.display_name);
-            case 'date':
-                return new Date(streamB.started_at) - new Date(streamA.started_at);
-            case 'viewers':
-                return streamB.viewer_count - streamA.viewer_count;
-            default:
-                return 0;
-        }
-    });
-    
-    // Затем сортируем оффлайн стримеров
-    const sortedOffline = [...offlineStreamers].sort((a, b) => {
-        const streamerA = streamersInfo.find(s => s.login.toLowerCase() === a.toLowerCase());
-        const streamerB = streamersInfo.find(s => s.login.toLowerCase() === b.toLowerCase());
-        
-        // Получаем данные из Firebase
-        const streamerDataA = database.ref(`users/${userId}/streamersData/${a}`).once('value');
-        const streamerDataB = database.ref(`users/${userId}/streamersData/${b}`).once('value');
-        
-        const dataA = streamerDataA.then(snap => snap.val());
-        const dataB = streamerDataB.then(snap => snap.val());
-        
-        return Promise.all([dataA, dataB]).then(([dataA, dataB]) => {
-            switch(sortBy) {
-                case 'name':
-                    return streamerA.display_name.localeCompare(streamerB.display_name);
-                case 'date':
-                    const dateA = dataA?.lastStreamDate || '';
-                    const dateB = dataB?.lastStreamDate || '';
-                    return new Date(dateB) - new Date(dateA);
-                case 'viewers':
-                    const viewersA = dataA?.viewerCount || 0;
-                    const viewersB = dataB?.viewerCount || 0;
-                    return viewersB - viewersA;
-                default:
-                    return 0;
-            }
-        });
-    });
-    
-    // Возвращаем объединенный массив (онлайн + оффлайн)
-    return [...sortedOnline, ...(await Promise.all(sortedOffline)).flat()];
 }
 
 function createStreamerCard(streamer, stream, videos) {
@@ -695,6 +629,7 @@ async function removeStreamer(login) {
     // Удаляем данные стримера из Firebase
     try {
         await database.ref(`users/${userId}/streamersData/${login.toLowerCase()}`).remove();
+        await database.ref(`users/${userId}/notifications/${login.toLowerCase()}`).remove();
     } catch (error) {
         console.error('Ошибка удаления данных стримера:', error);
     }
@@ -710,6 +645,7 @@ async function deleteAllStreamers() {
     // Удаляем все данные стримеров из Firebase
     try {
         await database.ref(`users/${userId}/streamersData`).remove();
+        await database.ref(`users/${userId}/notifications`).remove();
     } catch (error) {
         console.error('Ошибка удаления данных стримеров:', error);
     }
@@ -738,6 +674,11 @@ async function checkForStatusChanges() {
             const previousViewers = previousData[login]?.viewerCount || 0;
             const streamStart = currentData[login]?.lastStreamDate;
             
+            // Получаем данные уведомления из Firebase
+            const notificationRef = database.ref(`users/${userId}/notifications/${login}`);
+            const notificationSnapshot = await notificationRef.once('value');
+            let notificationData = notificationSnapshot.val() || {};
+            
             // Если статус изменился
             if (currentStatus && previousStatus && currentStatus !== previousStatus) {
                 if (currentStatus === 'online') {
@@ -752,17 +693,22 @@ async function checkForStatusChanges() {
                     const response = await sendTelegramNotification(message);
                     if (response.ok) {
                         const data = await response.json();
-                        lastNotificationIds[login] = {
+                        
+                        // Сохраняем данные уведомления в Firebase
+                        notificationData = {
                             messageId: data.result.message_id,
                             peakViewers: currentViewers,
                             lastGame: currentGame,
-                            lastTitle: currentTitle
+                            lastTitle: currentTitle,
+                            lastStatus: 'online'
                         };
+                        
+                        await notificationRef.set(notificationData);
                     }
                 } else if (currentStatus === 'offline') {
                     // Удаляем предыдущее уведомление, если оно есть
-                    if (lastNotificationIds[login]?.messageId) {
-                        await deleteTelegramNotification(lastNotificationIds[login].messageId);
+                    if (notificationData.messageId) {
+                        await deleteTelegramNotification(notificationData.messageId);
                     }
                     
                     // Получаем информацию о последнем стриме
@@ -776,9 +722,9 @@ async function checkForStatusChanges() {
                     const videosData = await videosResponse.json();
                     const lastVideo = videosData.data?.[0];
                     const duration = lastVideo?.duration ? formatDuration(lastVideo.duration) : 'неизвестно';
-                    const finalTitle = lastVideo?.title || currentTitle;
-                    const finalGame = lastVideo?.game_name || lastNotificationIds[login]?.lastGame || currentGame;
-                    const peakViewers = lastNotificationIds[login]?.peakViewers || previousViewers;
+                    const finalTitle = lastVideo?.title || notificationData.lastTitle || currentTitle;
+                    const finalGame = lastVideo?.game_name || notificationData.lastGame || currentGame;
+                    const peakViewers = notificationData.peakViewers || previousViewers;
                     
                     // Отправляем новое уведомление о завершении
                     const message = `🔴 *${streamerName} закончил стрим*\n\n` +
@@ -789,7 +735,9 @@ async function checkForStatusChanges() {
                                    `[Канал на Twitch](https://twitch.tv/${login})`;
                     
                     await sendTelegramNotification(message);
-                    delete lastNotificationIds[login];
+                    
+                    // Удаляем данные уведомления из Firebase
+                    await notificationRef.remove();
                 }
             } 
             // Если стрим продолжается и есть изменения
@@ -799,20 +747,26 @@ async function checkForStatusChanges() {
                 const viewersChanged = currentViewers !== previousViewers;
                 
                 // Обновляем пиковое количество зрителей
-                if (lastNotificationIds[login] && currentViewers > lastNotificationIds[login].peakViewers) {
-                    lastNotificationIds[login].peakViewers = currentViewers;
+                if (notificationData && currentViewers > (notificationData.peakViewers || 0)) {
+                    notificationData.peakViewers = currentViewers;
+                    await notificationRef.update({ peakViewers: currentViewers });
                 }
                 
                 // Если есть значительные изменения (название, категория или зрители)
                 if (titleChanged || gameChanged || viewersChanged) {
                     // Обновляем последние данные
-                    if (lastNotificationIds[login]) {
-                        if (titleChanged) lastNotificationIds[login].lastTitle = currentTitle;
-                        if (gameChanged) lastNotificationIds[login].lastGame = currentGame;
+                    if (notificationData) {
+                        const updates = {};
+                        if (titleChanged) updates.lastTitle = currentTitle;
+                        if (gameChanged) updates.lastGame = currentGame;
+                        
+                        if (Object.keys(updates).length > 0) {
+                            await notificationRef.update(updates);
+                        }
                     }
                     
                     // Редактируем существующее сообщение
-                    if (lastNotificationIds[login]?.messageId) {
+                    if (notificationData?.messageId) {
                         const message = `🟢 *${streamerName} в эфире!*\n\n` +
                                        `📺 *Название:* ${currentTitle}\n` +
                                        `🎮 *Категория:* ${currentGame}\n` +
@@ -820,7 +774,7 @@ async function checkForStatusChanges() {
                                        `⏱ *Длительность:* ${formatStreamDuration(streamStart)}\n\n` +
                                        `[Смотреть на Twitch](https://twitch.tv/${login})`;
                         
-                        await editTelegramNotification(lastNotificationIds[login].messageId, message);
+                        await editTelegramNotification(notificationData.messageId, message);
                     }
                 }
             }
