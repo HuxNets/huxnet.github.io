@@ -3,7 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="favicon1.png" type="image/png">
     <title>Анализатор YouTube</title>
+    <script>
+        // Защита от открытия инструментов разработчика
+        document.onkeydown = function(e) {
+            if (e.keyCode == 123 || // F12
+                (e.ctrlKey && e.shiftKey && e.keyCode == 73) || // Ctrl+Shift+I
+                (e.ctrlKey && e.shiftKey && e.keyCode == 74) || // Ctrl+Shift+J
+                (e.ctrlKey && e.keyCode == 85) // Ctrl+U
+            ) {
+                return false;
+            }
+        };
+        
+        // Запрет контекстного меню
+        document.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+        });
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
     <style>
@@ -28,42 +46,68 @@
             padding: 0;
         }
 
+        .header-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            position: relative;
+            width: 100%;
+        }
+
         .back-button {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            background: rgba(255, 255, 255, 0.1);
+            background: linear-gradient(45deg, var(--primary), var(--secondary));
             border: none;
             border-radius: 8px;
             color: white;
-            padding: 10px 15px;
+            padding: 10px 20px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
             text-decoration: none;
             display: inline-block;
+            box-shadow: 0 2px 10px rgba(157, 101, 201, 0.3);
+            position: absolute;
+            left: 0;
         }
 
         .back-button:hover {
-            background: rgba(255, 255, 255, 0.2);
             transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(157, 101, 201, 0.4);
+        }
+
+        .title-container {
+            width: 100%;
+            text-align: center;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 2rem;
+            background: linear-gradient(45deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            display: inline-block;
         }
 
         .container {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 20px;
-            padding-top: 60px;
+            padding: 30px 20px;
+            box-sizing: border-box;
         }
 
         .card {
             background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(10px);
             border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 20px;
+            padding: 25px;
+            margin-bottom: 25px;
             border: 1px solid rgba(255, 255, 255, 0.1);
             position: relative;
+            box-sizing: border-box;
+            width: 100%;
         }
 
         .card::before {
@@ -77,12 +121,14 @@
         }
 
         .input-group {
-            margin-bottom: 15px;
+            margin-bottom: 20px;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         label {
             display: block;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
             font-weight: 500;
         }
 
@@ -94,6 +140,7 @@
             background: rgba(255, 255, 255, 0.1);
             color: white;
             font-family: 'Poppins', sans-serif;
+            box-sizing: border-box;
         }
 
         button {
@@ -105,6 +152,10 @@
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
+            width: 100%;
+            max-width: 300px;
+            display: block;
+            margin: 0 auto;
         }
 
         button:hover {
@@ -119,21 +170,26 @@
             border-radius: 8px;
             max-height: 400px;
             overflow-y: auto;
+            box-sizing: border-box;
         }
 
         .result-item {
-            padding: 8px 0;
+            padding: 10px 0;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            word-break: break-all;
+            word-break: break-word;
             display: flex;
             align-items: center;
             justify-content: space-between;
+            box-sizing: border-box;
         }
 
         .video-link {
             color: var(--info);
             text-decoration: none;
             margin-right: 10px;
+            flex-grow: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .video-link:hover {
@@ -159,12 +215,20 @@
             font-weight: 600;
             font-size: 1.1rem;
             color: var(--success);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+
+        .total-views:hover {
+            opacity: 0.8;
         }
 
         .loading {
             display: none;
             text-align: center;
             padding: 20px;
+            box-sizing: border-box;
         }
 
         .spinner {
@@ -186,6 +250,7 @@
             color: var(--danger);
             margin-top: 10px;
             display: none;
+            text-align: center;
         }
 
         .calculator-result {
@@ -193,40 +258,76 @@
             font-size: 1.2rem;
             font-weight: 600;
             color: var(--primary);
+            text-align: center;
+        }
+
+        .calculator {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .calculator-section {
+            flex: 1;
+            min-width: 300px;
         }
 
         @media (max-width: 768px) {
-            .calculator {
+            .header-container {
                 flex-direction: column;
+                align-items: flex-start;
+                gap: 15px;
             }
             
             .back-button {
-                top: 10px;
-                left: 10px;
-                padding: 8px 12px;
-                font-size: 0.9rem;
+                position: static;
+                margin-bottom: 15px;
+            }
+            
+            .title-container {
+                text-align: left;
+                width: 100%;
+            }
+            
+            h1 {
+                font-size: 1.5rem;
+            }
+            
+            .container {
+                padding: 20px 15px;
+            }
+            
+            .card {
+                padding: 20px;
+            }
+            
+            .calculator-section {
+                min-width: 100%;
             }
         }
     </style>
 </head>
 <body>
-    <a href="index.html" class="back-button animate__animated animate__fadeIn">НАЗАД</a>
-    
     <div class="container">
-        <h1 class="animate__animated animate__fadeIn">Анализатор YouTube</h1>
+        <div class="header-container animate__animated animate__fadeIn">
+            <a href="index.html" class="back-button">НАЗАД</a>
+            <div class="title-container">
+                <h1>Анализатор YouTube</h1>
+            </div>
+        </div>
        
         <div class="card animate__animated animate__fadeInUp">
             <div class="input-group">
                 <label for="channelUrl">Ссылка на канал YouTube:</label>
-                <input type="text" id="channelUrl" placeholder="https://www.youtube.com/@имяканала или https://www.youtube.com/channel/UC...">
+                <input type="text" id="channelUrl" placeholder="https://www.youtube.com/@имяканала или https://www.youtube.com/channel/UC..." onkeydown="handleKeyDown(event)">
             </div>
             
             <div class="input-group">
-                <label for="maxResults">Количество видео для анализа (макс. 50):</label>
-                <input type="number" id="maxResults" min="1" max="50" value="10">
+                <label for="maxResults">Количество видео для анализа (макс. 100):</label>
+                <input type="number" id="maxResults" min="1" max="100" value="1" onkeydown="handleKeyDown(event)">
             </div>
             
-            <button id="analyzeBtn">Анализировать канал</button>
+            <button id="analyzeBtn" onclick="analyzeChannel()">Анализировать канал</button>
             
             <div class="loading" id="loading">
                 <div class="spinner"></div>
@@ -247,7 +348,7 @@
                 <h3>Калькулятор CPM</h3>
                 <div class="input-group">
                     <label for="cpmRate">Ставка за 1000 просмотров (₽):</label>
-                    <input type="number" id="cpmRate" placeholder="например, 50" value="50">
+                    <input type="number" id="cpmRate" placeholder="например, 50">
                 </div>
                 <div class="input-group">
                     <label for="viewsCount">Количество просмотров:</label>
@@ -274,326 +375,354 @@
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // ВАШ YOUTUBE API КЛЮЧ (ЗАМЕНИТЕ НА СВОЙ ДЕЙСТВИТЕЛЬНЫЙ КЛЮЧ)
-            const YOUTUBE_API_KEY = 'AIzaSyCegzb37gx8GGOfZy7NlodDrOrtcHKbbRo';
-            
-            // Элементы интерфейса
-            const analyzeBtn = document.getElementById('analyzeBtn');
-            const channelUrlInput = document.getElementById('channelUrl');
-            const maxResultsInput = document.getElementById('maxResults');
-            const resultsDiv = document.getElementById('results');
-            const resultItemsDiv = document.getElementById('resultItems');
-            const totalViewsDiv = document.getElementById('totalViews');
-            const copyBtn = document.getElementById('copyBtn');
-            const loadingDiv = document.getElementById('loading');
-            const errorDiv = document.getElementById('error');
-            const cpmRateInput = document.getElementById('cpmRate');
-            const viewsCountInput = document.getElementById('viewsCount');
-            const earnedAmountInput = document.getElementById('earnedAmount');
-            const earnedViewsInput = document.getElementById('earnedViews');
-            const cpmResultDiv = document.getElementById('cpmResult');
-            const rateResultDiv = document.getElementById('rateResult');
+        // ВАШ YOUTUBE API КЛЮЧ (ЗАМЕНИТЕ НА СВОЙ ДЕЙСТВИТЕЛЬНЫЙ КЛЮЧ)
+        const YOUTUBE_API_KEY = 'AIzaSyCegzb37gx8GGOfZy7NlodDrOrtcHKbbRo';
+        
+        // Элементы интерфейса
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const channelUrlInput = document.getElementById('channelUrl');
+        const maxResultsInput = document.getElementById('maxResults');
+        const resultsDiv = document.getElementById('results');
+        const resultItemsDiv = document.getElementById('resultItems');
+        const totalViewsDiv = document.getElementById('totalViews');
+        const copyBtn = document.getElementById('copyBtn');
+        const loadingDiv = document.getElementById('loading');
+        const errorDiv = document.getElementById('error');
+        const cpmRateInput = document.getElementById('cpmRate');
+        const viewsCountInput = document.getElementById('viewsCount');
+        const earnedAmountInput = document.getElementById('earnedAmount');
+        const earnedViewsInput = document.getElementById('earnedViews');
+        const cpmResultDiv = document.getElementById('cpmResult');
+        const rateResultDiv = document.getElementById('rateResult');
 
-            // Проверка API ключа при загрузке
-            if (!YOUTUBE_API_KEY || YOUTUBE_API_KEY.includes('ZQZQZQZQZQ')) {
-                showError('Пожалуйста, установите ваш YouTube API ключ в коде');
-                analyzeBtn.disabled = true;
+        // Обработчик нажатия клавиши
+        function handleKeyDown(event) {
+            if (event.key === 'Enter') {
+                analyzeChannel();
+            }
+        }
+
+        // Функция анализа канала
+        async function analyzeChannel() {
+            const channelUrl = channelUrlInput.value.trim();
+            const maxResults = parseInt(maxResultsInput.value);
+            
+            if (!channelUrl) {
+                showError('Пожалуйста, введите ссылку на канал YouTube');
                 return;
             }
-
-            // Анализ канала
-            analyzeBtn.addEventListener('click', async function() {
-                const channelUrl = channelUrlInput.value.trim();
-                const maxResults = parseInt(maxResultsInput.value);
-                
-                if (!channelUrl) {
-                    showError('Пожалуйста, введите ссылку на канал YouTube');
-                    return;
-                }
-                
-                if (isNaN(maxResults) || maxResults < 1 || maxResults > 50) {
-                    showError('Введите корректное количество видео (от 1 до 50)');
-                    return;
-                }
-                
-                loadingDiv.style.display = 'block';
-                errorDiv.style.display = 'none';
-                resultsDiv.style.display = 'none';
-                
-                try {
-                    // Получаем ID канала
-                    const channelId = await getChannelId(channelUrl);
-                    if (!channelId) {
-                        throw new Error('Не удалось определить ID канала. Проверьте правильность ссылки.');
-                    }
-                    
-                    // Получаем список видео
-                    const videos = await getChannelVideos(channelId, maxResults);
-                    if (!videos || videos.length === 0) {
-                        throw new Error('Не удалось получить видео канала. Возможно, канал не содержит видео или они скрыты.');
-                    }
-                    
-                    // Получаем статистику видео
-                    const videosWithStats = await getVideosStatistics(videos);
-                    if (!videosWithStats || videosWithStats.length === 0) {
-                        throw new Error('Не удалось получить статистику видео.');
-                    }
-                    
-                    // Отображаем результаты
-                    displayResults(videosWithStats);
-                    
-                } catch (error) {
-                    let errorMessage = error.message;
-                    
-                    if (errorMessage.includes('API key not valid')) {
-                        errorMessage = 'Неверный YouTube API ключ. Пожалуйста, проверьте ваш ключ.';
-                    } else if (errorMessage.includes('quota')) {
-                        errorMessage = 'Превышена квота API. Попробуйте позже или используйте другой API ключ.';
-                    } else if (errorMessage.includes('channel') || errorMessage.includes('Custom URL')) {
-                        errorMessage = 'Канал не найден. Попробуйте использовать прямую ссылку с channel/ID.';
-                    } else if (errorMessage.includes('invalid argument')) {
-                        errorMessage = 'Ошибка запроса. Убедитесь, что ссылка корректна.';
-                    }
-                    
-                    showError(errorMessage);
-                } finally {
-                    loadingDiv.style.display = 'none';
-                }
-            });
             
-            // Функция для получения ID канала
-            async function getChannelId(channelUrl) {
-                try {
-                    // Если это прямая ссылка с channel ID
-                    if (channelUrl.includes('channel/')) {
-                        const channelId = channelUrl.split('channel/')[1].split('/')[0].split('?')[0];
-                        if (channelId.startsWith('UC') && channelId.length > 10) {
-                            return channelId;
-                        }
-                    }
-                    
-                    // Если это custom URL (@username)
-                    if (channelUrl.includes('@')) {
-                        const username = channelUrl.split('@')[1].split('/')[0];
-                        
-                        // Сначала пробуем получить через channels.list
-                        let apiUrl = `https://www.googleapis.com/youtube/v3/channels?part=id&forUsername=${username}&key=${YOUTUBE_API_KEY}`;
-                        let response = await fetch(apiUrl);
-                        
-                        if (response.ok) {
-                            const data = await response.json();
-                            if (data.items && data.items.length > 0) {
-                                return data.items[0].id;
-                            }
-                        }
-                        
-                        // Если не нашли через forUsername, пробуем поиск
-                        apiUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(username)}&type=channel&maxResults=1&key=${YOUTUBE_API_KEY}`;
-                        response = await fetch(apiUrl);
-                        
-                        if (response.ok) {
-                            const data = await response.json();
-                            if (data.items && data.items.length > 0 && data.items[0].id.kind === 'youtube#channel') {
-                                return data.items[0].id.channelId;
-                            }
-                        }
-                        
-                        throw new Error('Custom URL (@username) не найден.');
-                    }
-                    
-                    // Если это не URL, а просто название канала
-                    if (!channelUrl.startsWith('http')) {
-                        const apiUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(channelUrl)}&type=channel&maxResults=1&key=${YOUTUBE_API_KEY}`;
-                        const response = await fetch(apiUrl);
-                        
-                        if (response.ok) {
-                            const data = await response.json();
-                            if (data.items && data.items.length > 0 && data.items[0].id.kind === 'youtube#channel') {
-                                return data.items[0].id.channelId;
-                            }
-                        }
-                        
-                        throw new Error('Канал не найден по названию.');
-                    }
-                    
-                    // Если это другой формат URL
-                    const lastPart = channelUrl.split('/').pop().split('?')[0];
-                    if (lastPart.startsWith('UC') && lastPart.length > 10) {
-                        return lastPart;
-                    }
-                    
-                    throw new Error('Не удалось определить ID канала.');
-                    
-                } catch (error) {
-                    throw new Error('Не удалось получить информацию о канале: ' + error.message);
-                }
+            if (isNaN(maxResults) || maxResults < 1 || maxResults > 100) {
+                showError('Введите корректное количество видео (от 1 до 100)');
+                return;
             }
             
-            // Функция для получения видео канала
-            async function getChannelVideos(channelId, maxResults) {
-                try {
-                    const apiUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&maxResults=${maxResults}&order=date&type=video&key=${YOUTUBE_API_KEY}`;
-                    const response = await fetch(apiUrl);
-                    
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.error?.message || 'Ошибка при запросе видео');
-                    }
-                    
-                    const data = await response.json();
-                    
-                    if (!data.items || data.items.length === 0) {
-                        throw new Error('На канале нет видео или они скрыты');
-                    }
-                    
-                    return data.items.map(item => item.id?.videoId).filter(id => id);
-                    
-                } catch (error) {
-                    throw error;
-                }
-            }
+            loadingDiv.style.display = 'block';
+            errorDiv.style.display = 'none';
+            resultsDiv.style.display = 'none';
             
-            // Функция для получения статистики видео
-            async function getVideosStatistics(videoIds) {
-                try {
-                    const idsString = videoIds.join(',');
-                    const apiUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${idsString}&key=${YOUTUBE_API_KEY}`;
-                    const response = await fetch(apiUrl);
-                    
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.error?.message || 'Ошибка при запросе статистики');
-                    }
-                    
-                    const data = await response.json();
-                    
-                    if (!data.items || data.items.length === 0) {
-                        throw new Error('Не удалось получить статистику видео');
-                    }
-                    
-                    return data.items.map(item => ({
-                        url: `https://youtu.be/${item.id}`,
-                        title: item.snippet.title,
-                        views: parseInt(item.statistics?.viewCount) || 0,
-                        publishedAt: item.snippet.publishedAt
-                    }));
-                    
-                } catch (error) {
-                    throw error;
+            try {
+                // Получаем ID канала
+                const channelId = await getChannelId(channelUrl);
+                if (!channelId) {
+                    throw new Error('Не удалось определить ID канала. Проверьте правильность ссылки.');
                 }
-            }
-            
-            // Отображение результатов
-            function displayResults(videos) {
-                resultItemsDiv.innerHTML = '';
-                let totalViews = 0;
                 
-                videos.forEach(video => {
-                    const videoElement = document.createElement('div');
-                    videoElement.className = 'result-item';
-                    
-                    const linkElement = document.createElement('a');
-                    linkElement.href = video.url;
-                    linkElement.target = '_blank';
-                    linkElement.className = 'video-link';
-                    linkElement.textContent = `${video.url} - ${video.views.toLocaleString('ru-RU')} просмотров`;
-                    
-                    const removeBtn = document.createElement('button');
-                    removeBtn.className = 'remove-btn';
-                    removeBtn.innerHTML = '×';
-                    removeBtn.addEventListener('click', () => {
-                        videoElement.remove();
-                        updateTotalViews();
-                    });
-                    
-                    videoElement.appendChild(linkElement);
-                    videoElement.appendChild(removeBtn);
-                    resultItemsDiv.appendChild(videoElement);
-                    
-                    totalViews += video.views;
-                });
-                
-                totalViewsDiv.textContent = `Всего: ${totalViews.toLocaleString('ru-RU')} просмотров`;
-                resultsDiv.style.display = 'block';
-                
-                function updateTotalViews() {
-                    let newTotal = 0;
-                    const items = resultItemsDiv.querySelectorAll('.result-item');
-                    items.forEach(item => {
-                        const viewsText = item.querySelector('.video-link').textContent.split(' - ')[1];
-                        const views = parseInt(viewsText.replace(/\D/g, ''));
-                        newTotal += views;
-                    });
-                    totalViewsDiv.textContent = `Всего: ${newTotal.toLocaleString('ru-RU')} просмотров`;
+                // Получаем список видео
+                const videos = await getChannelVideos(channelId, maxResults);
+                if (!videos || videos.length === 0) {
+                    throw new Error('Не удалось получить видео канала. Возможно, канал не содержит видео или они скрыты.');
                 }
-            }
-            
-            // Показать ошибку
-            function showError(message) {
-                errorDiv.textContent = message;
-                errorDiv.style.display = 'block';
+                
+                // Получаем статистику видео
+                const videosWithStats = await getVideosStatistics(videos);
+                if (!videosWithStats || videosWithStats.length === 0) {
+                    throw new Error('Не удалось получить статистику видео.');
+                }
+                
+                // Отображаем результаты
+                displayResults(videosWithStats);
+                
+            } catch (error) {
+                let errorMessage = error.message;
+                
+                if (errorMessage.includes('API key not valid')) {
+                    errorMessage = 'Неверный YouTube API ключ. Пожалуйста, проверьте ваш ключ.';
+                } else if (errorMessage.includes('quota')) {
+                    errorMessage = 'Превышена квота API. Попробуйте позже или используйте другой API ключ.';
+                } else if (errorMessage.includes('channel') || errorMessage.includes('Custom URL')) {
+                    errorMessage = 'Канал не найден. Попробуйте использовать прямую ссылку с channel/ID.';
+                } else if (errorMessage.includes('invalid argument')) {
+                    errorMessage = 'Ошибка запроса. Убедитесь, что ссылка корректна.';
+                }
+                
+                showError(errorMessage);
+            } finally {
                 loadingDiv.style.display = 'none';
             }
-            
-            // Копирование результатов (без кнопок удаления)
-            copyBtn.addEventListener('click', function() {
-                const items = resultItemsDiv.querySelectorAll('.video-link');
-                let resultsText = '';
+        }
+
+        // Проверка API ключа при загрузке
+        if (!YOUTUBE_API_KEY || YOUTUBE_API_KEY.includes('ZQZQZQZQZQ')) {
+            showError('Пожалуйста, установите ваш YouTube API ключ в коде');
+            analyzeBtn.disabled = true;
+        }
+
+        // Анализ канала по клику на кнопку
+        analyzeBtn.addEventListener('click', analyzeChannel);
+        
+        // Функция для получения ID канала
+        async function getChannelId(channelUrl) {
+            try {
+                // Если это прямая ссылка с channel ID
+                if (channelUrl.includes('channel/')) {
+                    const channelId = channelUrl.split('channel/')[1].split('/')[0].split('?')[0];
+                    if (channelId.startsWith('UC') && channelId.length > 10) {
+                        return channelId;
+                    }
+                }
                 
-                items.forEach(item => {
-                    resultsText += item.textContent + '\n';
+                // Если это custom URL (@username)
+                if (channelUrl.includes('@')) {
+                    const username = channelUrl.split('@')[1].split('/')[0];
+                    
+                    // Сначала пробуем получить через channels.list
+                    let apiUrl = `https://www.googleapis.com/youtube/v3/channels?part=id&forUsername=${username}&key=${YOUTUBE_API_KEY}`;
+                    let response = await fetch(apiUrl);
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.items && data.items.length > 0) {
+                            return data.items[0].id;
+                        }
+                    }
+                    
+                    // Если не нашли через forUsername, пробуем поиск
+                    apiUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(username)}&type=channel&maxResults=1&key=${YOUTUBE_API_KEY}`;
+                    response = await fetch(apiUrl);
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.items && data.items.length > 0 && data.items[0].id.kind === 'youtube#channel') {
+                            return data.items[0].id.channelId;
+                        }
+                    }
+                    
+                    throw new Error('Custom URL (@username) не найден.');
+                }
+                
+                // Если это не URL, а просто название канала
+                if (!channelUrl.startsWith('http')) {
+                    const apiUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(channelUrl)}&type=channel&maxResults=1&key=${YOUTUBE_API_KEY}`;
+                    const response = await fetch(apiUrl);
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.items && data.items.length > 0 && data.items[0].id.kind === 'youtube#channel') {
+                            return data.items[0].id.channelId;
+                        }
+                    }
+                    
+                    throw new Error('Канал не найден по названию.');
+                }
+                
+                // Если это другой формат URL
+                const lastPart = channelUrl.split('/').pop().split('?')[0];
+                if (lastPart.startsWith('UC') && lastPart.length > 10) {
+                    return lastPart;
+                }
+                
+                throw new Error('Не удалось определить ID канала.');
+                
+            } catch (error) {
+                throw new Error('Не удалось получить информацию о канале: ' + error.message);
+            }
+        }
+        
+        // Функция для получения видео канала
+        async function getChannelVideos(channelId, maxResults) {
+            try {
+                const apiUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&maxResults=${maxResults}&order=date&type=video&key=${YOUTUBE_API_KEY}`;
+                const response = await fetch(apiUrl);
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error?.message || 'Ошибка при запросе видео');
+                }
+                
+                const data = await response.json();
+                
+                if (!data.items || data.items.length === 0) {
+                    throw new Error('На канале нет видео или они скрыты');
+                }
+                
+                return data.items.map(item => item.id?.videoId).filter(id => id);
+                
+            } catch (error) {
+                throw error;
+            }
+        }
+        
+        // Функция для получения статистики видео
+        async function getVideosStatistics(videoIds) {
+            try {
+                const idsString = videoIds.join(',');
+                const apiUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${idsString}&key=${YOUTUBE_API_KEY}`;
+                const response = await fetch(apiUrl);
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error?.message || 'Ошибка при запросе статистики');
+                }
+                
+                const data = await response.json();
+                
+                if (!data.items || data.items.length === 0) {
+                    throw new Error('Не удалось получить статистику видео');
+                }
+                
+                return data.items.map(item => ({
+                    url: `https://youtu.be/${item.id}`,
+                    title: item.snippet.title,
+                    views: parseInt(item.statistics?.viewCount) || 0,
+                    publishedAt: item.snippet.publishedAt
+                }));
+                
+            } catch (error) {
+                throw error;
+            }
+        }
+        
+        // Функция для форматирования даты в формате [DD.MM]
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            return `[${day}.${month}]`;
+        }
+        
+        // Отображение результатов
+        function displayResults(videos) {
+            resultItemsDiv.innerHTML = '';
+            let totalViews = 0;
+            
+            videos.forEach(video => {
+                const videoElement = document.createElement('div');
+                videoElement.className = 'result-item';
+                
+                const linkElement = document.createElement('a');
+                linkElement.href = video.url;
+                linkElement.target = '_blank';
+                linkElement.className = 'video-link';
+                linkElement.textContent = `${formatDate(video.publishedAt)} ${video.url} - ${video.views.toLocaleString('ru-RU')} просмотров`;
+                
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'remove-btn';
+                removeBtn.innerHTML = '×';
+                removeBtn.addEventListener('click', () => {
+                    videoElement.remove();
+                    updateTotalViews();
                 });
                 
-                resultsText += totalViewsDiv.textContent;
+                videoElement.appendChild(linkElement);
+                videoElement.appendChild(removeBtn);
+                resultItemsDiv.appendChild(videoElement);
                 
-                navigator.clipboard.writeText(resultsText)
+                totalViews += video.views;
+            });
+            
+            totalViewsDiv.textContent = `Всего: ${totalViews.toLocaleString('ru-RU')} просмотров`;
+            resultsDiv.style.display = 'block';
+            
+            // Добавляем обработчик клика для копирования общего количества просмотров
+            totalViewsDiv.addEventListener('click', function() {
+                const viewsText = totalViewsDiv.textContent.split(': ')[1].replace(' просмотров', '');
+                navigator.clipboard.writeText(viewsText)
                     .then(() => {
-                        const originalText = copyBtn.innerText;
-                        copyBtn.innerText = 'Скопировано!';
+                        const originalText = totalViewsDiv.textContent;
+                        totalViewsDiv.textContent = 'Скопировано!';
                         setTimeout(() => {
-                            copyBtn.innerText = originalText;
+                            totalViewsDiv.textContent = originalText;
                         }, 2000);
                     });
             });
             
-            // Калькулятор CPM
-            document.getElementById('calculateBtn').addEventListener('click', function() {
-                const rate = parseFloat(cpmRateInput.value);
-                const views = parseInt(viewsCountInput.value);
-                
-                if (isNaN(rate)) {
-                    cpmResultDiv.textContent = 'Введите корректную ставку';
-                    return;
-                }
-                
-                if (isNaN(views)) {
-                    cpmResultDiv.textContent = 'Введите корректное количество просмотров';
-                    return;
-                }
-                
-                const earnings = (views / 1000) * rate;
-                cpmResultDiv.textContent = `Примерный доход: ₽${earnings.toFixed(2)}`;
+            function updateTotalViews() {
+                let newTotal = 0;
+                const items = resultItemsDiv.querySelectorAll('.result-item');
+                items.forEach(item => {
+                    const viewsText = item.querySelector('.video-link').textContent.split(' - ')[1];
+                    const views = parseInt(viewsText.replace(/\D/g, ''));
+                    newTotal += views;
+                });
+                totalViewsDiv.textContent = `Всего: ${newTotal.toLocaleString('ru-RU')} просмотров`;
+            }
+        }
+        
+        // Показать ошибку
+        function showError(message) {
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            loadingDiv.style.display = 'none';
+        }
+        
+        // Копирование результатов (без кнопок удаления)
+        copyBtn.addEventListener('click', function() {
+            const items = resultItemsDiv.querySelectorAll('.video-link');
+            let resultsText = '';
+            
+            items.forEach(item => {
+                resultsText += item.textContent + '\n';
             });
             
-            // Калькулятор ставки
-            document.getElementById('calculateRateBtn').addEventListener('click', function() {
-                const amount = parseFloat(earnedAmountInput.value);
-                const views = parseInt(earnedViewsInput.value);
-                
-                if (isNaN(amount)) {
-                    rateResultDiv.textContent = 'Введите корректную сумму';
-                    return;
-                }
-                
-                if (isNaN(views)) {
-                    rateResultDiv.textContent = 'Введите корректное количество просмотров';
-                    return;
-                }
-                
-                const rate = (amount / views) * 1000;
-                rateResultDiv.textContent = `Ставка за 1000 просмотров: ₽${rate.toFixed(2)}`;
-            });
+            resultsText += totalViewsDiv.textContent;
+            
+            navigator.clipboard.writeText(resultsText)
+                .then(() => {
+                    const originalText = copyBtn.innerText;
+                    copyBtn.innerText = 'Скопировано!';
+                    setTimeout(() => {
+                        copyBtn.innerText = originalText;
+                    }, 2000);
+                });
+        });
+        
+        // Калькулятор CPM
+        document.getElementById('calculateBtn').addEventListener('click', function() {
+            const rate = parseFloat(cpmRateInput.value);
+            const views = parseInt(viewsCountInput.value);
+            
+            if (isNaN(rate)) {
+                cpmResultDiv.textContent = 'Введите корректную ставку';
+                return;
+            }
+            
+            if (isNaN(views)) {
+                cpmResultDiv.textContent = 'Введите корректное количество просмотров';
+                return;
+            }
+            
+            const earnings = (views / 1000) * rate;
+            cpmResultDiv.textContent = `Примерный доход: ₽${earnings.toFixed(2)}`;
+        });
+        
+        // Калькулятор ставки
+        document.getElementById('calculateRateBtn').addEventListener('click', function() {
+            const amount = parseFloat(earnedAmountInput.value);
+            const views = parseInt(earnedViewsInput.value);
+            
+            if (isNaN(amount)) {
+                rateResultDiv.textContent = 'Введите корректную сумму';
+                return;
+            }
+            
+            if (isNaN(views)) {
+                rateResultDiv.textContent = 'Введите корректное количество просмотров';
+                return;
+            }
+            
+            const rate = (amount / views) * 1000;
+            rateResultDiv.textContent = `Ставка за 1000 просмотров: ₽${rate.toFixed(2)}`;
         });
     </script>
 </body>
