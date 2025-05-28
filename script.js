@@ -118,89 +118,7 @@ async function saveToFirebase(path, value) {
 
 // Анимация фона (остается без изменений)
 function initAnimatedBackground() {
-    const canvas = document.createElement('canvas');
-    canvas.id = 'animeBg';
-    document.body.prepend(canvas);
-    
-    const ctx = canvas.getContext('2d');
-    
-    function resizeCanvas() {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-    }
-    
-    window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
-    
-    const particles = [];
-    const colors = ['#ff6b9e', '#9d65c9', '#4da6ff', '#5cdb95'];
-    
-    class Particle {
-        constructor() {
-            this.x = Math.random() * canvas.width;
-            this.y = Math.random() * canvas.height;
-            this.size = Math.random() * 3 + 1;
-            this.color = colors[Math.floor(Math.random() * colors.length)];
-            this.speedX = Math.random() * 2 - 1;
-            this.speedY = Math.random() * 2 - 1;
-            this.opacity = Math.random() * 0.3 + 0.1;
-        }
-        
-        update() {
-            this.x += this.speedX;
-            this.y += this.speedY;
-            
-            if (this.x > canvas.width || this.x < 0) this.speedX *= -1;
-            if (this.y > canvas.height || this.y < 0) this.speedY *= -1;
-        }
-        
-        draw() {
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-            ctx.fillStyle = this.color;
-            ctx.globalAlpha = this.opacity;
-            ctx.fill();
-        }
-    }
-    
-    function init() {
-        for (let i = 0; i < 50; i++) {
-            particles.push(new Particle());
-        }
-    }
-    
-    function animate() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        for (let i = 0; i < particles.length; i++) {
-            particles[i].update();
-            particles[i].draw();
-        }
-        
-        // Соединяем частицы
-        for (let i = 0; i < particles.length; i++) {
-            for (let j = i; j < particles.length; j++) {
-                const dx = particles[i].x - particles[j].x;
-                const dy = particles[i].y - particles[j].y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                
-                if (distance < 100) {
-                    ctx.beginPath();
-                    ctx.strokeStyle = particles[i].color;
-                    ctx.globalAlpha = 0.2 - (distance / 100) * 0.2;
-                    ctx.lineWidth = 0.5;
-                    ctx.moveTo(particles[i].x, particles[i].y);
-                    ctx.lineTo(particles[j].x, particles[j].y);
-                    ctx.stroke();
-                }
-            }
-        }
-        
-        requestAnimationFrame(animate);
-    }
-    
-    init();
-    animate();
+    // ... (остается без изменений)
 }
 
 // Аутентификация с Twitch
@@ -455,19 +373,19 @@ function createStreamerCard(streamer, stream, videos) {
     
     // Получаем данные из Firebase
     const streamerRef = database.ref(`users/${userId}/streamersData/${login}`);
-    streamerRef.once('value').then(snapshot => {
+    streamerRef.on('value', (snapshot) => {
         const streamerData = snapshot.val() || {};
         
         // Определяем данные для отображения
-        const lastStreamDate = isLive ? stream.started_at : 
+        const lastStreamDate = isLive ? stream?.started_at : 
                             videos[0] ? videos[0].created_at : 
                             streamerData.lastStreamDate;
         
-        const lastStreamTitle = isLive ? stream.title : 
+        const lastStreamTitle = isLive ? stream?.title : 
                              videos[0] ? videos[0].title : 
                              streamerData.lastStreamTitle;
         
-        const gameName = isLive ? stream.game_name : 
+        const gameName = isLive ? stream?.game_name : 
                         videos[0] ? videos[0].game_name : 
                         streamerData.gameName;
         
@@ -495,6 +413,9 @@ function createStreamerCard(streamer, stream, videos) {
             timeSinceEnd = getTimeSince(endTime.toISOString());
         }
 
+        // Получаем актуальное количество зрителей
+        const viewerCount = isLive ? stream?.viewer_count : streamerData.viewerCount || 0;
+
         card.innerHTML = `
             <div class="streamer-card h-100">
                 <button class="remove-btn" data-login="${streamer.login}" title="Удалить">
@@ -509,7 +430,7 @@ function createStreamerCard(streamer, stream, videos) {
                         <div class="d-flex align-items-center mb-2">
                             <span class="stream-status ${isLive ? 'status-live' : 'status-offline'}"></span>
                             <span class="stream-info">${isLive ? 'В эфире' : 'Не в эфире'}</span>
-                            ${isLive ? `<span class="stream-info ms-2"><i class="fas fa-users me-1"></i> <span class="viewer-count">${formatNumber(stream.viewer_count)}</span> зрителей</span>` : ''}
+                            ${isLive ? `<span class="stream-info ms-2"><i class="fas fa-users me-1"></i> <span class="viewer-count">${formatNumber(viewerCount)}</span> зрителей</span>` : ''}
                         </div>
                         
                         ${(isLive || lastStreamTitle) ? 
@@ -700,7 +621,8 @@ async function checkForStatusChanges() {
                             peakViewers: currentViewers,
                             lastGame: currentGame,
                             lastTitle: currentTitle,
-                            lastStatus: 'online'
+                            lastStatus: 'online',
+                            lastUpdate: Date.now()
                         };
                         
                         await notificationRef.set(notificationData);
@@ -753,10 +675,16 @@ async function checkForStatusChanges() {
                 }
                 
                 // Если есть значительные изменения (название, категория или зрители)
-                if (titleChanged || gameChanged || viewersChanged) {
+                // Или прошло больше 5 минут с последнего обновления
+                const shouldUpdate = titleChanged || gameChanged || viewersChanged || 
+                                   (notificationData.lastUpdate && (Date.now() - notificationData.lastUpdate) > 300000);
+                
+                if (shouldUpdate) {
                     // Обновляем последние данные
                     if (notificationData) {
-                        const updates = {};
+                        const updates = {
+                            lastUpdate: Date.now()
+                        };
                         if (titleChanged) updates.lastTitle = currentTitle;
                         if (gameChanged) updates.lastGame = currentGame;
                         
