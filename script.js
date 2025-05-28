@@ -327,6 +327,17 @@ async function loadTrackedStreamers() {
             !streamsInfo.some(s => s.user_login.toLowerCase() === login.toLowerCase())
         );
         
+        // Получаем данные оффлайн стримеров из Firebase
+        const offlineStreamersData = await Promise.all(
+            offlineStreamers.map(async login => {
+                const snapshot = await database.ref(`users/${userId}/streamersData/${login}`).once('value');
+                return {
+                    login,
+                    data: snapshot.val() || {}
+                };
+            })
+        );
+        
         // Сортируем онлайн стримеров
         const sortedOnline = [...onlineStreamers].sort((a, b) => {
             const streamerA = streamersInfo.find(s => s.login.toLowerCase() === a.toLowerCase());
@@ -347,16 +358,11 @@ async function loadTrackedStreamers() {
         });
         
         // Сортируем оффлайн стримеров
-        const sortedOffline = await Promise.all([...offlineStreamers].sort(async (a, b) => {
+        const sortedOffline = [...offlineStreamers].sort((a, b) => {
+            const dataA = offlineStreamersData.find(s => s.login === a)?.data || {};
+            const dataB = offlineStreamersData.find(s => s.login === b)?.data || {};
             const streamerA = streamersInfo.find(s => s.login.toLowerCase() === a.toLowerCase());
             const streamerB = streamersInfo.find(s => s.login.toLowerCase() === b.toLowerCase());
-            
-            // Получаем данные из Firebase
-            const streamerDataA = await database.ref(`users/${userId}/streamersData/${a}`).once('value');
-            const streamerDataB = await database.ref(`users/${userId}/streamersData/${b}`).once('value');
-            
-            const dataA = streamerDataA.val() || {};
-            const dataB = streamerDataB.val() || {};
             
             switch(currentSort) {
                 case 'name':
@@ -372,7 +378,7 @@ async function loadTrackedStreamers() {
                 default:
                     return 0;
             }
-        }));
+        });
         
         // Объединяем отсортированные списки (онлайн всегда вверху)
         const sortedStreamers = [...sortedOnline, ...sortedOffline];
