@@ -33,6 +33,7 @@ const sortButtons = document.querySelectorAll('.btn-sort');
 const notificationToast = new bootstrap.Toast(document.querySelector('.toast'));
 const lastNotificationIds = {};
 
+
 // Переменные состояния
 let trackedStreamers = [];
 let currentSort = 'name';
@@ -729,8 +730,10 @@ async function checkForStatusChanges() {
             const currentStatus = currentData[login]?.lastStatus;
             const previousStatus = previousData[login]?.lastStatus;
             const streamerName = currentData[login]?.displayName || login;
-            const gameName = currentData[login]?.gameName || 'Unknown Game';
-            const title = currentData[login]?.lastStreamTitle || 'No title';
+            const currentGame = currentData[login]?.gameName || 'Unknown Game';
+            const previousGame = previousData[login]?.gameName || 'Unknown Game';
+            const currentTitle = currentData[login]?.lastStreamTitle || 'No title';
+            const previousTitle = previousData[login]?.lastStreamTitle || 'No title';
             const currentViewers = currentData[login]?.viewerCount || 0;
             const previousViewers = previousData[login]?.viewerCount || 0;
             const streamStart = currentData[login]?.lastStreamDate;
@@ -740,8 +743,8 @@ async function checkForStatusChanges() {
                 if (currentStatus === 'online') {
                     // Отправляем новое уведомление о начале стрима
                     const message = `🟢 *${streamerName} начал стрим!*\n\n` +
-                                   `📺 *Название:* ${title}\n` +
-                                   `🎮 *Игра:* ${gameName}\n` +
+                                   `📺 *Название:* ${currentTitle}\n` +
+                                   `🎮 *Категория:* ${currentGame}\n` +
                                    `👥 *Зрителей:* ${formatNumber(currentViewers)}\n` +
                                    `⏱ *Длительность:* ${formatStreamDuration(streamStart)}\n\n` +
                                    `[Смотреть на Twitch](https://twitch.tv/${login})`;
@@ -749,13 +752,17 @@ async function checkForStatusChanges() {
                     const response = await sendTelegramNotification(message);
                     if (response.ok) {
                         const data = await response.json();
-                        lastNotificationIds[login] = data.result.message_id;
+                        lastNotificationIds[login] = {
+                            messageId: data.result.message_id,
+                            peakViewers: currentViewers,
+                            lastGame: currentGame,
+                            lastTitle: currentTitle
+                        };
                     }
                 } else if (currentStatus === 'offline') {
                     // Удаляем предыдущее уведомление, если оно есть
-                    if (lastNotificationIds[login]) {
-                        await deleteTelegramNotification(lastNotificationIds[login]);
-                        delete lastNotificationIds[login];
+                    if (lastNotificationIds[login]?.messageId) {
+                        await deleteTelegramNotification(lastNotificationIds[login].messageId);
                     }
                     
                     // Получаем информацию о последнем стриме
@@ -769,36 +776,51 @@ async function checkForStatusChanges() {
                     const videosData = await videosResponse.json();
                     const lastVideo = videosData.data?.[0];
                     const duration = lastVideo?.duration ? formatDuration(lastVideo.duration) : 'неизвестно';
-                    const finalTitle = lastVideo?.title || title;
+                    const finalTitle = lastVideo?.title || currentTitle;
+                    const finalGame = lastVideo?.game_name || lastNotificationIds[login]?.lastGame || currentGame;
+                    const peakViewers = lastNotificationIds[login]?.peakViewers || previousViewers;
                     
                     // Отправляем новое уведомление о завершении
                     const message = `🔴 *${streamerName} закончил стрим*\n\n` +
                                    `📺 *Название:* ${finalTitle}\n` +
-                                   `🎮 *Игра:* ${gameName}\n` +
+                                   `🎮 *Категория:* ${finalGame}\n` +
                                    `⏱ *Длительность:* ${duration}\n` +
-                                   `👥 *Макс. зрителей:* ${formatNumber(previousData[login]?.peakViewers || previousViewers)}\n\n` +
+                                   `👥 *Макс. зрителей:* ${formatNumber(peakViewers)}\n\n` +
                                    `[Канал на Twitch](https://twitch.tv/${login})`;
                     
                     await sendTelegramNotification(message);
+                    delete lastNotificationIds[login];
                 }
             } 
             // Если стрим продолжается и есть изменения
             else if (currentStatus === 'online' && previousStatus === 'online') {
-                const titleChanged = currentData[login]?.lastStreamTitle !== previousData[login]?.lastStreamTitle;
+                const titleChanged = currentTitle !== previousTitle;
+                const gameChanged = currentGame !== previousGame;
                 const viewersChanged = currentViewers !== previousViewers;
                 
-                // Если есть значительные изменения (название или зрители)
-                if (titleChanged || viewersChanged) {
-                    // Редактируем существующее сообщение
+                // Обновляем пиковое количество зрителей
+                if (lastNotificationIds[login] && currentViewers > lastNotificationIds[login].peakViewers) {
+                    lastNotificationIds[login].peakViewers = currentViewers;
+                }
+                
+                // Если есть значительные изменения (название, категория или зрители)
+                if (titleChanged || gameChanged || viewersChanged) {
+                    // Обновляем последние данные
                     if (lastNotificationIds[login]) {
+                        if (titleChanged) lastNotificationIds[login].lastTitle = currentTitle;
+                        if (gameChanged) lastNotificationIds[login].lastGame = currentGame;
+                    }
+                    
+                    // Редактируем существующее сообщение
+                    if (lastNotificationIds[login]?.messageId) {
                         const message = `🟢 *${streamerName} в эфире!*\n\n` +
-                                       `📺 *Название:* ${title}\n` +
-                                       `🎮 *Игра:* ${gameName}\n` +
+                                       `📺 *Название:* ${currentTitle}\n` +
+                                       `🎮 *Категория:* ${currentGame}\n` +
                                        `👥 *Зрителей:* ${formatNumber(currentViewers)}\n` +
                                        `⏱ *Длительность:* ${formatStreamDuration(streamStart)}\n\n` +
                                        `[Смотреть на Twitch](https://twitch.tv/${login})`;
                         
-                        await editTelegramNotification(lastNotificationIds[login], message);
+                        await editTelegramNotification(lastNotificationIds[login].messageId, message);
                     }
                 }
             }
