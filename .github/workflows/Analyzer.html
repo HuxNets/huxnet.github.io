@@ -395,6 +395,19 @@
         const cpmResultDiv = document.getElementById('cpmResult');
         const rateResultDiv = document.getElementById('rateResult');
 
+        // Загрузка сохранённой ссылки при загрузке страницы
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedChannelUrl = localStorage.getItem('youtubeAnalyzer_channelUrl');
+            if (savedChannelUrl) {
+                channelUrlInput.value = savedChannelUrl;
+            }
+            
+            // Сохраняем ссылку при изменении
+            channelUrlInput.addEventListener('input', function() {
+                localStorage.setItem('youtubeAnalyzer_channelUrl', this.value);
+            });
+        });
+
         // Обработчик нажатия клавиши
         function handleKeyDown(event) {
             if (event.key === 'Enter') {
