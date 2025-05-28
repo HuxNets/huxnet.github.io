@@ -307,7 +307,6 @@ async function loadTrackedStreamers() {
     try {
         // Удаляем дубликаты перед загрузкой
         trackedStreamers = [...new Set(trackedStreamers)];
-        await saveToFirebase('trackedStreamers', trackedStreamers);
         
         const [streamersInfo, streamsInfo] = await Promise.all([
             getStreamersInfo(trackedStreamers),
@@ -383,6 +382,9 @@ async function loadTrackedStreamers() {
         // Объединяем отсортированные списки (онлайн всегда вверху)
         const sortedStreamers = [...sortedOnline, ...sortedOffline];
         
+        // Сохраняем отсортированный список в базу данных
+        await saveToFirebase('trackedStreamers', sortedStreamers); // <-- ВОТ СЮДА
+        
         // Очищаем контейнер перед загрузкой
         streamersContainer.innerHTML = '';
         
@@ -402,6 +404,7 @@ async function loadTrackedStreamers() {
         console.error('Ошибка загрузки данных:', error);
     }
 }
+
 
 // Обновление данных о последних стримах
 async function updateLastStreamsData(streamersInfo, streamsInfo, videosInfo) {
@@ -442,6 +445,69 @@ async function updateLastStreamsData(streamersInfo, streamsInfo, videosInfo) {
     } catch (error) {
         console.error('Ошибка обновления данных в Firebase:', error);
     }
+}
+
+// Сортировка стримеров
+async function sortStreamers(logins, streamersInfo, streamsInfo, sortBy) {
+    const onlineStreamers = logins.filter(login => 
+        streamsInfo.some(s => s.user_login.toLowerCase() === login.toLowerCase())
+    );
+    
+    const offlineStreamers = logins.filter(login => 
+        !streamsInfo.some(s => s.user_login.toLowerCase() === login.toLowerCase())
+    );
+    
+    // Сначала сортируем онлайн стримеров
+    const sortedOnline = [...onlineStreamers].sort((a, b) => {
+        const streamerA = streamersInfo.find(s => s.login.toLowerCase() === a.toLowerCase());
+        const streamerB = streamersInfo.find(s => s.login.toLowerCase() === b.toLowerCase());
+        const streamA = streamsInfo.find(s => s.user_login.toLowerCase() === a.toLowerCase());
+        const streamB = streamsInfo.find(s => s.user_login.toLowerCase() === b.toLowerCase());
+        
+        switch(sortBy) {
+            case 'name':
+                return streamerA.display_name.localeCompare(streamerB.display_name);
+            case 'date':
+                return new Date(streamB.started_at) - new Date(streamA.started_at);
+            case 'viewers':
+                return streamB.viewer_count - streamA.viewer_count;
+            default:
+                return 0;
+        }
+    });
+    
+    // Затем сортируем оффлайн стримеров
+    const sortedOffline = [...offlineStreamers].sort((a, b) => {
+        const streamerA = streamersInfo.find(s => s.login.toLowerCase() === a.toLowerCase());
+        const streamerB = streamersInfo.find(s => s.login.toLowerCase() === b.toLowerCase());
+        
+        // Получаем данные из Firebase
+        const streamerDataA = database.ref(`users/${userId}/streamersData/${a}`).once('value');
+        const streamerDataB = database.ref(`users/${userId}/streamersData/${b}`).once('value');
+        
+        const dataA = streamerDataA.then(snap => snap.val());
+        const dataB = streamerDataB.then(snap => snap.val());
+        
+        return Promise.all([dataA, dataB]).then(([dataA, dataB]) => {
+            switch(sortBy) {
+                case 'name':
+                    return streamerA.display_name.localeCompare(streamerB.display_name);
+                case 'date':
+                    const dateA = dataA?.lastStreamDate || '';
+                    const dateB = dataB?.lastStreamDate || '';
+                    return new Date(dateB) - new Date(dateA);
+                case 'viewers':
+                    const viewersA = dataA?.viewerCount || 0;
+                    const viewersB = dataB?.viewerCount || 0;
+                    return viewersB - viewersA;
+                default:
+                    return 0;
+            }
+        });
+    });
+    
+    // Возвращаем объединенный массив (онлайн + оффлайн)
+    return [...sortedOnline, ...(await Promise.all(sortedOffline)).flat()];
 }
 
 function createStreamerCard(streamer, stream, videos) {
