@@ -553,7 +553,7 @@ function createStreamerCard(streamer, stream, videos) {
                                     <span class="ms-2"><i class="fas fa-hourglass-half me-1"></i> Длительность: ${formatStreamDuration(stream.started_at)}</span>
                                 </div>` :
                                 lastStreamDate ? 
-                                    `<i class="far fa-clock me-1"></i> Последний стрим: ${formatDate(lastStreamDate)}${timeSinceEnd ? ` (закончился ${timeSinceEnd})` : ''}` :
+                                    `<i class="far fa-clock me-1"></i> Последний стрим: ${formatDate(lastStreamDate)}${timeSinceEnd ? ` (был ${timeSinceEnd})` : ''}` :
                                     `<i class="far fa-clock me-1"></i> Данные о стримах отсутствуют`
                             }
                         </div>
