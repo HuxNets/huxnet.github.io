@@ -3,7 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="favicon.png" type="image/png">
     <title>Трекер Стримеров</title>
+    <!-- Подключение Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
+    
     <link rel="preload" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" as="style">
     <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" as="style">
     <link rel="preload" href="styles.css" as="style">
@@ -13,18 +18,19 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
     <link rel="stylesheet" href="styles.css">
-    
 </head>
 <body>
     <div class="container">
         <header class="text-center my-4">
-            <div class="d-flex justify-content-center align-items-center position-relative">
-                <a href="analizator.html" class="btn btn-primary position-absolute start-0">Анализатор YouTube</a>
-                <h1 class="title animate__animated animate__fadeInDown m-0">
-                    <i class="fas fa-stream me-2"></i> Трекер Стримеров
-                </h1>
-            </div>
-        </header>
+    <div class="d-flex justify-content-center align-items-center position-relative">
+        <a href="Analyzer.html" class="btn btn-primary position-absolute start-0" style="background: linear-gradient(45deg, #ff6b9e, #9d65c9); border: none; border-radius: 50px; padding: 10px 20px; font-weight: 600; transition: all 0.3s ease;">
+            <i class="fas fa-chart-line me-2"></i> Анализатор YouTube
+        </a>
+        <h1 class="title animate__animated animate__fadeInDown m-0">
+            <i class="fas fa-stream me-2"></i> Трекер Стримеров
+        </h1>
+    </div>
+</header>
         
         <div class="row mb-4 animate__animated animate__fadeIn animate__fast">
             <div class="col-md-8 mx-auto">
@@ -57,31 +63,40 @@
             </div>
         </div>
         
+        <div id="notificationToast" class="toast-container position-fixed top-0 end-0 p-3">
+            <div class="toast align-items-center text-white bg-success" role="alert" aria-live="assertive" aria-atomic="true">
+                <div class="d-flex">
+                    <div class="toast-body"></div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+            </div>
+        </div>
+        
         <div class="row g-4" id="streamersContainer"></div>
     </div>
-    
+ <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js"></script>
     <script src="script.js"></script>
     
-    <script>
-        // Защита от просмотра кода
-        document.addEventListener('keydown', function(e) {
-            if (e.ctrlKey && (e.keyCode === 85 || e.keyCode === 117)) {
-                e.preventDefault();
-                window.location.href = "about:blank";
-            }
-            if (e.keyCode === 123) {
-                e.preventDefault();
-                window.location.href = "about:blank";
-            }
-        });
-        
-        document.addEventListener('contextmenu', function(e) {
-            e.preventDefault();
-            return false;
-        });
-    </script>
+    <!-- Защита от просмотра кода -->
+     <script>
+document.addEventListener('contextmenu', function(e) {
+    e.preventDefault();
+    return false;
+});
+
+document.addEventListener('keydown', function(e) {
+    // Блокировка F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+U
+    if (e.key === 'F12' || 
+        (e.ctrlKey && e.shiftKey && e.key === 'I') || 
+        (e.ctrlKey && e.shiftKey && e.key === 'J') || 
+        (e.ctrlKey && e.key === 'U')) {
+        e.preventDefault();
+        return false;
+    }
+});
+
+</script>
 </body>
 </html>
