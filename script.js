@@ -31,6 +31,7 @@ const errorMessage = document.getElementById('errorMessage');
 const deleteAllBtn = document.getElementById('deleteAllBtn');
 const sortButtons = document.querySelectorAll('.btn-sort');
 const notificationToast = new bootstrap.Toast(document.querySelector('.toast'));
+const lastNotificationIds = {};
 
 // Переменные состояния
 let trackedStreamers = [];
