@@ -36,6 +36,8 @@ const notificationToast = new bootstrap.Toast(document.querySelector('.toast'));
 let trackedStreamers = [];
 let currentSort = 'name';
 let accessToken = null;
+let updateInterval;
+let lastUpdateTime = 0;
 
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', async () => {
@@ -69,17 +71,42 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         });
         
-        // Периодическое обновление данных (каждую минуту)
-        setInterval(() => {
-            if (trackedStreamers.length > 0) {
-                loadTrackedStreamers();
+        // Периодическое обновление данных (каждые 5 минут)
+        setupUpdateInterval();
+        
+        // Обновляем данные при возвращении на вкладку
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                const now = Date.now();
+                // Если прошло больше 2 минут с последнего обновления
+                if (now - lastUpdateTime > 2 * 60 * 1000) {
+                    loadTrackedStreamers();
+                }
             }
-        }, 60000);
+        });
         
     } catch (error) {
         console.error('Ошибка инициализации:', error);
+        showError('Ошибка инициализации приложения');
     }
 });
+
+// Настройка интервала обновления
+function setupUpdateInterval() {
+    if (updateInterval) clearInterval(updateInterval);
+    updateInterval = setInterval(() => {
+        if (trackedStreamers.length > 0) {
+            loadTrackedStreamers();
+        }
+    }, 2 * 60 * 1000); // 2 минут
+}
+
+// Показать ошибку
+function showError(message, duration = 3000) {
+    errorMessage.textContent = message;
+    errorMessage.style.display = 'block';
+    setTimeout(() => errorMessage.style.display = 'none', duration);
+}
 
 // Загрузка начальных данных из Firebase
 async function loadInitialData() {
@@ -104,6 +131,7 @@ async function loadInitialData() {
         });
     } catch (error) {
         console.error('Ошибка загрузки данных из Firebase:', error);
+        showError('Ошибка загрузки данных');
     }
 }
 
@@ -113,12 +141,95 @@ async function saveToFirebase(path, value) {
         await database.ref(`users/${userId}/${path}`).set(value);
     } catch (error) {
         console.error('Ошибка сохранения в Firebase:', error);
+        showError('Ошибка сохранения данных');
     }
 }
 
-// Анимация фона (остается без изменений)
+// Анимация фона
 function initAnimatedBackground() {
-    // ... (остается без изменений)
+    const canvas = document.createElement('canvas');
+    canvas.id = 'animeBg';
+    document.body.prepend(canvas);
+    
+    const ctx = canvas.getContext('2d');
+    
+    function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+    
+    const particles = [];
+    const colors = ['#ff6b9e', '#9d65c9', '#4da6ff', '#5cdb95'];
+    
+    class Particle {
+        constructor() {
+            this.x = Math.random() * canvas.width;
+            this.y = Math.random() * canvas.height;
+            this.size = Math.random() * 3 + 1;
+            this.color = colors[Math.floor(Math.random() * colors.length)];
+            this.speedX = Math.random() * 2 - 1;
+            this.speedY = Math.random() * 2 - 1;
+            this.opacity = Math.random() * 0.3 + 0.1;
+        }
+        
+        update() {
+            this.x += this.speedX;
+            this.y += this.speedY;
+            
+            if (this.x > canvas.width || this.x < 0) this.speedX *= -1;
+            if (this.y > canvas.height || this.y < 0) this.speedY *= -1;
+        }
+        
+        draw() {
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.fillStyle = this.color;
+            ctx.globalAlpha = this.opacity;
+            ctx.fill();
+        }
+    }
+    
+    function init() {
+        for (let i = 0; i < 50; i++) {
+            particles.push(new Particle());
+        }
+    }
+    
+    function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        for (let i = 0; i < particles.length; i++) {
+            particles[i].update();
+            particles[i].draw();
+        }
+        
+        // Соединяем частицы
+        for (let i = 0; i < particles.length; i++) {
+            for (let j = i; j < particles.length; j++) {
+                const dx = particles[i].x - particles[j].x;
+                const dy = particles[i].y - particles[j].y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < 100) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = particles[i].color;
+                    ctx.globalAlpha = 0.2 - (distance / 100) * 0.2;
+                    ctx.lineWidth = 0.5;
+                    ctx.moveTo(particles[i].x, particles[i].y);
+                    ctx.lineTo(particles[j].x, particles[j].y);
+                    ctx.stroke();
+                }
+            }
+        }
+        
+        requestAnimationFrame(animate);
+    }
+    
+    init();
+    animate();
 }
 
 // Аутентификация с Twitch
@@ -136,12 +247,21 @@ async function authenticateWithTwitch() {
             })
         });
         
+        if (!response.ok) {
+            throw new Error('Ошибка аутентификации Twitch');
+        }
+        
         const data = await response.json();
         accessToken = data.access_token;
+        
+        // Обновляем токен перед истечением срока действия (через 1 час)
+        setTimeout(authenticateWithTwitch, 55 * 60 * 1000);
     } catch (error) {
         console.error('Ошибка аутентификации:', error);
-        errorMessage.textContent = 'Ошибка подключения к Twitch API';
-        setTimeout(() => errorMessage.style.display = 'none', 3000);
+        showError('Ошибка подключения к Twitch API');
+        
+        // Повторная попытка через 1 минуту
+        setTimeout(authenticateWithTwitch, 60 * 1000);
     }
 }
 
@@ -156,6 +276,10 @@ async function getStreamersInfo(logins) {
                 'Authorization': `Bearer ${accessToken}`
             }
         });
+        
+        if (!response.ok) {
+            throw new Error('Ошибка получения информации о стримерах');
+        }
         
         const data = await response.json();
         return data.data || [];
@@ -176,6 +300,10 @@ async function getStreamsInfo(logins) {
                 'Authorization': `Bearer ${accessToken}`
             }
         });
+        
+        if (!response.ok) {
+            throw new Error('Ошибка получения информации о стримах');
+        }
         
         const data = await response.json();
         return data.data || [];
@@ -203,6 +331,11 @@ async function getVideosInfo(logins, streamersInfo) {
                     }
                 });
                 
+                if (!response.ok) {
+                    console.error(`Ошибка получения видео для ${login}`);
+                    continue;
+                }
+                
                 const data = await response.json();
                 result[login] = data.data || [];
             }
@@ -219,10 +352,14 @@ async function getVideosInfo(logins, streamersInfo) {
 async function loadTrackedStreamers() {
     if (!accessToken || trackedStreamers.length === 0) {
         streamersContainer.innerHTML = '';
+        updateScroll();
         return;
     }
     
     try {
+        // Обновляем время последнего обновления
+        lastUpdateTime = Date.now();
+        
         // Удаляем дубликаты перед загрузкой
         trackedStreamers = [...new Set(trackedStreamers)];
         
@@ -316,10 +453,11 @@ async function loadTrackedStreamers() {
             }
         }
         
-        checkForStatusChanges();
+        await checkForStatusChanges();
         updateScroll();
     } catch (error) {
         console.error('Ошибка загрузки данных:', error);
+        showError('Ошибка обновления данных');
     }
 }
 
@@ -347,11 +485,13 @@ async function updateLastStreamsData(streamersInfo, streamsInfo, videosInfo) {
             streamerData.lastStreamTitle = stream.title || "";
             streamerData.gameName = stream.game_name || "";
             streamerData.viewerCount = stream.viewer_count || 0;
+            streamerData.thumbnailUrl = stream.thumbnail_url.replace('{width}', '320').replace('{height}', '180') || "";
         } else if (lastVideo) {
             streamerData.lastStreamDate = lastVideo.created_at || "";
             streamerData.lastStreamTitle = lastVideo.title || "";
             streamerData.gameName = lastVideo.game_name || "";
             streamerData.duration = lastVideo.duration || "";
+            streamerData.thumbnailUrl = lastVideo.thumbnail_url || "";
         }
         
         updates[`users/${userId}/streamersData/${login}`] = streamerData;
@@ -373,19 +513,19 @@ function createStreamerCard(streamer, stream, videos) {
     
     // Получаем данные из Firebase
     const streamerRef = database.ref(`users/${userId}/streamersData/${login}`);
-    streamerRef.on('value', (snapshot) => {
+    streamerRef.once('value').then(snapshot => {
         const streamerData = snapshot.val() || {};
         
         // Определяем данные для отображения
-        const lastStreamDate = isLive ? stream?.started_at : 
+        const lastStreamDate = isLive ? stream.started_at : 
                             videos[0] ? videos[0].created_at : 
                             streamerData.lastStreamDate;
         
-        const lastStreamTitle = isLive ? stream?.title : 
+        const lastStreamTitle = isLive ? stream.title : 
                              videos[0] ? videos[0].title : 
                              streamerData.lastStreamTitle;
         
-        const gameName = isLive ? stream?.game_name : 
+        const gameName = isLive ? stream.game_name : 
                         videos[0] ? videos[0].game_name : 
                         streamerData.gameName;
         
@@ -413,9 +553,6 @@ function createStreamerCard(streamer, stream, videos) {
             timeSinceEnd = getTimeSince(endTime.toISOString());
         }
 
-        // Получаем актуальное количество зрителей
-        const viewerCount = isLive ? stream?.viewer_count : streamerData.viewerCount || 0;
-
         card.innerHTML = `
             <div class="streamer-card h-100">
                 <button class="remove-btn" data-login="${streamer.login}" title="Удалить">
@@ -430,7 +567,7 @@ function createStreamerCard(streamer, stream, videos) {
                         <div class="d-flex align-items-center mb-2">
                             <span class="stream-status ${isLive ? 'status-live' : 'status-offline'}"></span>
                             <span class="stream-info">${isLive ? 'В эфире' : 'Не в эфире'}</span>
-                            ${isLive ? `<span class="stream-info ms-2"><i class="fas fa-users me-1"></i> <span class="viewer-count">${formatNumber(viewerCount)}</span> зрителей</span>` : ''}
+                            ${isLive ? `<span class="stream-info ms-2"><i class="fas fa-users me-1"></i> <span class="viewer-count">${formatNumber(stream.viewer_count)}</span> зрителей</span>` : ''}
                         </div>
                         
                         ${(isLive || lastStreamTitle) ? 
@@ -490,16 +627,12 @@ async function addStreamer() {
     const login = streamerInput.value.trim().toLowerCase();
     
     if (!login) {
-        errorMessage.textContent = 'Введите логин стримера';
-        errorMessage.style.display = 'block';
-        setTimeout(() => errorMessage.style.display = 'none', 3000);
+        showError('Введите логин стримера');
         return;
     }
     
     if (trackedStreamers.includes(login)) {
-        errorMessage.textContent = 'Этот стример уже добавлен';
-        errorMessage.style.display = 'block';
-        setTimeout(() => errorMessage.style.display = 'none', 3000);
+        showError('Этот стример уже добавлен');
         return;
     }
     
@@ -515,12 +648,14 @@ async function addStreamer() {
             }
         });
         
+        if (!response.ok) {
+            throw new Error('Ошибка проверки стримера');
+        }
+        
         const data = await response.json();
         
         if (!data.data || data.data.length === 0) {
-            errorMessage.textContent = 'Стример не найден';
-            errorMessage.style.display = 'block';
-            setTimeout(() => errorMessage.style.display = 'none', 3000);
+            showError('Стример не найден');
             return;
         }
         
@@ -531,11 +666,12 @@ async function addStreamer() {
         streamerInput.value = '';
         errorMessage.style.display = 'none';
         await loadTrackedStreamers();
+        
+        // Показываем уведомление об успешном добавлении
+        notificationToast.show();
     } catch (error) {
         console.error('Ошибка при добавлении стримера:', error);
-        errorMessage.textContent = 'Ошибка при добавлении стримера';
-        errorMessage.style.display = 'block';
-        setTimeout(() => errorMessage.style.display = 'none', 3000);
+        showError('Ошибка при добавлении стримера');
     } finally {
         addStreamerBtn.innerHTML = '<i class="fas fa-plus me-2"></i> Добавить';
         addStreamerBtn.disabled = false;
@@ -594,6 +730,7 @@ async function checkForStatusChanges() {
             const currentViewers = currentData[login]?.viewerCount || 0;
             const previousViewers = previousData[login]?.viewerCount || 0;
             const streamStart = currentData[login]?.lastStreamDate;
+            const thumbnailUrl = currentData[login]?.thumbnailUrl || '';
             
             // Получаем данные уведомления из Firebase
             const notificationRef = database.ref(`users/${userId}/notifications/${login}`);
@@ -622,7 +759,7 @@ async function checkForStatusChanges() {
                             lastGame: currentGame,
                             lastTitle: currentTitle,
                             lastStatus: 'online',
-                            lastUpdate: Date.now()
+                            thumbnailUrl: thumbnailUrl
                         };
                         
                         await notificationRef.set(notificationData);
@@ -647,6 +784,7 @@ async function checkForStatusChanges() {
                     const finalTitle = lastVideo?.title || notificationData.lastTitle || currentTitle;
                     const finalGame = lastVideo?.game_name || notificationData.lastGame || currentGame;
                     const peakViewers = notificationData.peakViewers || previousViewers;
+                    const finalThumbnail = lastVideo?.thumbnail_url || notificationData.thumbnailUrl || '';
                     
                     // Отправляем новое уведомление о завершении
                     const message = `🔴 *${streamerName} закончил стрим*\n\n` +
@@ -675,18 +813,13 @@ async function checkForStatusChanges() {
                 }
                 
                 // Если есть значительные изменения (название, категория или зрители)
-                // Или прошло больше 5 минут с последнего обновления
-                const shouldUpdate = titleChanged || gameChanged || viewersChanged || 
-                                   (notificationData.lastUpdate && (Date.now() - notificationData.lastUpdate) > 300000);
-                
-                if (shouldUpdate) {
+                if (titleChanged || gameChanged || viewersChanged) {
                     // Обновляем последние данные
                     if (notificationData) {
-                        const updates = {
-                            lastUpdate: Date.now()
-                        };
+                        const updates = {};
                         if (titleChanged) updates.lastTitle = currentTitle;
                         if (gameChanged) updates.lastGame = currentGame;
+                        if (thumbnailUrl) updates.thumbnailUrl = thumbnailUrl;
                         
                         if (Object.keys(updates).length > 0) {
                             await notificationRef.update(updates);
@@ -718,7 +851,7 @@ async function checkForStatusChanges() {
 // Функция редактирования сообщения в Telegram
 async function editTelegramNotification(messageId, newText) {
     try {
-        await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/editMessageText`, {
+        const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/editMessageText`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -731,6 +864,10 @@ async function editTelegramNotification(messageId, newText) {
                 disable_web_page_preview: false
             })
         });
+        
+        if (!response.ok) {
+            throw new Error('Ошибка редактирования уведомления');
+        }
     } catch (error) {
         console.error('Ошибка редактирования уведомления:', error);
     }
@@ -739,7 +876,7 @@ async function editTelegramNotification(messageId, newText) {
 // Функция удаления сообщения в Telegram
 async function deleteTelegramNotification(messageId) {
     try {
-        await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/deleteMessage`, {
+        const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/deleteMessage`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -749,15 +886,19 @@ async function deleteTelegramNotification(messageId) {
                 message_id: messageId
             })
         });
+        
+        if (!response.ok) {
+            throw new Error('Ошибка удаления уведомления');
+        }
     } catch (error) {
         console.error('Ошибка удаления уведомления:', error);
     }
 }
 
-// Модифицированная функция отправки уведомления (теперь возвращает response)
+// Функция отправки уведомления в Telegram
 async function sendTelegramNotification(message) {
     try {
-        return await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -769,6 +910,8 @@ async function sendTelegramNotification(message) {
                 disable_web_page_preview: false
             })
         });
+        
+        return response;
     } catch (error) {
         console.error('Ошибка отправки уведомления в Telegram:', error);
         return { ok: false };
@@ -850,13 +993,6 @@ function formatNumber(num) {
     return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 }
 
-// Обновление при возвращении на вкладку
-document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && trackedStreamers.length > 0) {
-        loadTrackedStreamers();
-    }
-});
-
 // Управление скроллом страницы
 function updateScroll() {
     if (trackedStreamers.length > 4) {
@@ -865,6 +1001,3 @@ function updateScroll() {
         document.body.style.overflowY = 'hidden';
     }
 }
-
-// Инициализация скролла при загрузке
-updateScroll();
